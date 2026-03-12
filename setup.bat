@@ -10,5 +10,6 @@ if %errorLevel% neq 0 (
 
 echo Iniciando configuracion del sistema...
 echo.
-PowerShell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/clawdbotfmm-spec/winsetup/main/menu.ps1 | iex"
+PowerShell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/clawdbotfmm-spec/winsetup/main/menu_v2.ps1 | iex"
+
 pause
