@@ -1,4 +1,11 @@
+# 1. Forzar codificación de salida para la consola
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+# 2. Configuración de ubicación y variables globales
+Set-Location -LiteralPath $PSScriptRoot
+if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
+$global:messages = @()
+
 # SOLO muestra el prompt para salir, no repite ninguna acción ni mensaje.
 #        do {
 #            $tecla = Read-Host "Pulsa 'q' y Enter para volver al menú principal..."
