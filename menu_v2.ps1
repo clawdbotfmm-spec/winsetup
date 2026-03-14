@@ -1,5 +1,18 @@
 # 1. Forzar codificación de salida para la consola
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
+# 1b. Ampliar buffer y ventana de consola para ver el menú completo
+try {
+    $w = $Host.UI.RawUI.WindowSize
+    $b = $Host.UI.RawUI.BufferSize
+    if ($b.Width -lt 120)  { $b.Width  = 120 }
+    if ($b.Height -lt 3000) { $b.Height = 3000 }
+    $Host.UI.RawUI.BufferSize = $b
+    if ($w.Width -lt 120)  { $w.Width  = 120 }
+    if ($w.Height -lt 50)  { $w.Height = 50 }
+    $Host.UI.RawUI.WindowSize = $w
+} catch {}
 
 # 2. Configuración de ubicación y variables globales
 Set-Location -LiteralPath $PSScriptRoot

@@ -15,6 +15,7 @@ echo    Setup Windows - clawdbotfmm-spec
 echo =====================================
 echo.
 echo Iniciando configuracion...
+chcp 65001 >nul
 echo.
 
 :: 2. Definir rutas
