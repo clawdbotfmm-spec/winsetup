@@ -1,4 +1,4 @@
-﻿# SOLO muestra el prompt para salir, no repite ninguna acción ni mensaje.
+# SOLO muestra el prompt para salir, no repite ninguna acción ni mensaje.
 #        do {
 #            $tecla = Read-Host "Pulsa 'q' y Enter para volver al menú principal..."
 #       } while ($tecla -ne 'q')
@@ -1294,6 +1294,66 @@ if (Test-Path $sevenZip) {
 }
 
 # --------------------------------------- 
+
+@{
+    Name   = "114 - Instalar Ollama (Chocolatey)"
+    Action = {
+        try {
+            Clear-Messages
+            Update-Messages "Instalando Ollama mediante Chocolatey..."
+
+            choco install ollama -y
+
+            Update-Messages "Ollama instalado correctamente."
+        }
+        catch {
+            Update-Messages "Error durante la instalación de Ollama: $($_.Exception.Message)"
+        }
+    }
+    Executed = $false
+}
+
+# --------------------------------------- 
+
+@{
+    Name   = "115 - Instalar OpenClaw"
+    Action = {
+        try {
+            Clear-Messages
+            Update-Messages "Descargando e instalando OpenClaw..."
+
+            iwr -useb https://openclaw.ai/install.ps1 | iex
+
+            Update-Messages "OpenClaw instalado correctamente."
+        }
+        catch {
+            Update-Messages "Error instalando OpenClaw: $($_.Exception.Message)"
+        }
+    }
+    Executed = $false
+}
+
+# ---------------------------------------
+
+@{
+    Name   = "116 - Lanzar OpenClaw (Ollama)"
+    Action = {
+        try {
+            Clear-Messages
+            Update-Messages "Lanzando OpenClaw con Ollama..."
+
+            ollama launch openclaw
+
+            Update-Messages "OpenClaw iniciado correctamente."
+        }
+        catch {
+            Update-Messages "Error al lanzar OpenClaw: $($_.Exception.Message)"
+        }
+    }
+    Executed = $false
+}
+
+# ---------------------------------------
 # OK
 @{
     Name = "210 - Mantenimiento completo del sistema DISM y SFC"
