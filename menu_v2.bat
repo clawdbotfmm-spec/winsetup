@@ -15,7 +15,6 @@ echo    Setup Windows - clawdbotfmm-spec
 echo =====================================
 echo.
 echo Iniciando configuracion...
-chcp 65001 >nul
 echo.
 
 :: 2. Definir rutas
@@ -24,8 +23,11 @@ set "LOCAL_PS1=%temp%\menu_v2_temp.ps1"
 
 :: 3. Descargar y ejecutar (Esto soluciona el error de $PSScriptRoot)
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+    "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; " ^
+    "$OutputEncoding = [System.Text.Encoding]::UTF8; " ^
     "Start-Transcript -Path $env:TEMP\winsetup_boot_log.txt -Force; " ^
-    "Invoke-WebRequest -Uri '%PS_URL%' -OutFile '%LOCAL_PS1%'; " ^
+    "$content = (Invoke-WebRequest -Uri '%PS_URL%' -UseBasicParsing).Content; " ^
+    "[System.IO.File]::WriteAllText('%LOCAL_PS1%', $content, [System.Text.Encoding]::UTF8); " ^
     "& '%LOCAL_PS1%'; " ^
     "Stop-Transcript; " ^
     "Remove-Item '%LOCAL_PS1%' -ErrorAction SilentlyContinue"
