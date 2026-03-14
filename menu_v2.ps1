@@ -1,6 +1,6 @@
-# SOLO muestra el prompt para salir, no repite ninguna acción ni mensaje.
+ï»¿# SOLO muestra el prompt para salir, no repite ninguna acciÃ³n ni mensaje.
 #        do {
-#            $tecla = Read-Host "Pulsa 'q' y Enter para volver al menú principal..."
+#            $tecla = Read-Host "Pulsa 'q' y Enter para volver al menÃº principal..."
 #       } while ($tecla -ne 'q')
 
 # PAUSA para que el usuario vea el resultado antes de limpiar
@@ -12,12 +12,12 @@ Set-Location -LiteralPath $PSScriptRoot
 
 # Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy RemoteSigned -Force
 
-# Línea divisoria
+# LÃ­nea divisoria
     Write-Host "------------------------------------------------------------" -ForegroundColor DarkGray
 
 # ---------------------------------------
 
-# Definición de comandos con estado inicial
+# DefiniciÃ³n de comandos con estado inicial
 
 $commands = @(
 
@@ -36,7 +36,7 @@ $commands = @(
             # Pausa breve para dar tiempo a que el mensaje se muestre
             Start-Sleep -Seconds 2
 
-            # Reiniciar el equipo de forma forzada y sin confirmación
+            # Reiniciar el equipo de forma forzada y sin confirmaciÃ³n
             Restart-Computer -Force -Confirm:$false
         }
         catch {
@@ -52,22 +52,22 @@ $commands = @(
 # ---------------------------------------
 # OK
 @{
-    Name   = "001 - Configurar política de ejecución"
+    Name   = "001 - Configurar polÃ­tica de ejecuciÃ³n"
     Action = {
         try {
             Clear-Messages
-            Update-Messages "Configurando política de ejecución..."
+            Update-Messages "Configurando polÃ­tica de ejecuciÃ³n..."
             Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy RemoteSigned -Force
-            Update-Messages "Política de ejecución configurada correctamente."
+            Update-Messages "PolÃ­tica de ejecuciÃ³n configurada correctamente."
         }
         catch [System.Security.AccessControl.PrivilegeNotHeldException] {
-            Update-Messages "? No se tienen privilegios necesarios para modificar políticas."
+            Update-Messages "? No se tienen privilegios necesarios para modificar polÃ­ticas."
         }
         catch [System.UnauthorizedAccessException] {
-            Update-Messages "? Acceso denegado. Asegúrate de ejecutar como administrador."
+            Update-Messages "? Acceso denegado. AsegÃºrate de ejecutar como administrador."
         }
         catch {
-            Update-Messages "? Error al configurar política de ejecución: $($_.Exception.Message)"
+            Update-Messages "? Error al configurar polÃ­tica de ejecuciÃ³n: $($_.Exception.Message)"
         }
     }
     Executed = $false
@@ -76,7 +76,7 @@ $commands = @(
 # ---------------------------------------
 # OK claude
 @{
-    Name     = "002 - Crear punto de restauración (forzado y verificado)"
+    Name     = "002 - Crear punto de restauraciÃ³n (forzado y verificado)"
     Action   = {
 
         # --- 1) Verificar administrador ---
@@ -89,64 +89,64 @@ $commands = @(
         }
 
         Clear-Messages
-        Update-Messages "Iniciando tarea: Crear punto de restauración..."
+        Update-Messages "Iniciando tarea: Crear punto de restauraciÃ³n..."
 
-        # --- 2) Verificar espacio libre mínimo en C: (mínimo 300 MB) ---
+        # --- 2) Verificar espacio libre mÃ­nimo en C: (mÃ­nimo 300 MB) ---
         $freeGB = (Get-PSDrive -Name C -ErrorAction SilentlyContinue).Free / 1GB
         if ($freeGB -lt 0.3) {
             Update-Messages "? Espacio insuficiente en C: ($([math]::Round($freeGB,2)) GB). Se necesitan al menos 300 MB."
             return
         }
 
-        # --- 3) Forzar protección del sistema al 5% via VSSAdmin (sin intervención humana) ---
+        # --- 3) Forzar protecciÃ³n del sistema al 5% via VSSAdmin (sin intervenciÃ³n humana) ---
         try {
-            Update-Messages "Configurando protección del sistema al 5% en C:..."
+            Update-Messages "Configurando protecciÃ³n del sistema al 5% en C:..."
 
-            # Activar protección por registro
+            # Activar protecciÃ³n por registro
             Set-ItemProperty `
                 -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" `
                 -Name "DisableSR" -Value 0 -Force -ErrorAction Stop
 
-            # Habilitar y asignar espacio máximo al 5% via vssadmin (esto evita tener que mover la barra manualmente)
+            # Habilitar y asignar espacio mÃ¡ximo al 5% via vssadmin (esto evita tener que mover la barra manualmente)
             $diskSize  = (Get-PSDrive -Name C).Used + (Get-PSDrive -Name C).Free
             $maxBytes  = [math]::Round($diskSize * 0.05)
             vssadmin resize shadowstorage /For=C: /On=C: /MaxSize="$($maxBytes)B" 2>&1 | Out-Null
 
-            # Habilitar via Enable-ComputerRestore también (doble seguro)
+            # Habilitar via Enable-ComputerRestore tambiÃ©n (doble seguro)
             Enable-ComputerRestore -Drive "C:\" -ErrorAction Stop
 
-            Update-Messages "? Protección del sistema habilitada al 5%."
+            Update-Messages "? ProtecciÃ³n del sistema habilitada al 5%."
         } catch {
-            Update-Messages "? Error al configurar protección: $($_.Exception.Message)"
+            Update-Messages "? Error al configurar protecciÃ³n: $($_.Exception.Message)"
             return
         }
 
-        # --- 4) Eliminar restricción de frecuencia de 24h (clave que bloquea crear otro punto) ---
+        # --- 4) Eliminar restricciÃ³n de frecuencia de 24h (clave que bloquea crear otro punto) ---
         try {
             Set-ItemProperty `
                 -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\SystemRestore" `
                 -Name "SystemRestorePointCreationFrequency" `
                 -Value 0 -Type DWord -Force -ErrorAction Stop
-            Update-Messages "? Restricción de frecuencia de 24h eliminada."
+            Update-Messages "? RestricciÃ³n de frecuencia de 24h eliminada."
         } catch {
             Update-Messages "?? No se pudo modificar la frecuencia: $($_.Exception.Message)"
         }
 
-        # --- 5) Crear punto de restauración con título que incluye ORIGINAL ---
-        $description = "ORIGINAL - Punto restauración manual " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+        # --- 5) Crear punto de restauraciÃ³n con tÃ­tulo que incluye ORIGINAL ---
+        $description = "ORIGINAL - Punto restauraciÃ³n manual " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
         $created = $false
 
         try {
-            Update-Messages "Creando punto de restauración: '$description'..."
+            Update-Messages "Creando punto de restauraciÃ³n: '$description'..."
             Checkpoint-Computer -Description $description `
                 -RestorePointType "MODIFY_SETTINGS" -ErrorAction Stop
             Start-Sleep -Seconds 5
             $created = $true
         } catch {
-            Update-Messages "? Error al crear punto de restauración: $($_.Exception.Message)"
+            Update-Messages "? Error al crear punto de restauraciÃ³n: $($_.Exception.Message)"
         }
 
-        # --- 6) Verificar que realmente se creó ---
+        # --- 6) Verificar que realmente se creÃ³ ---
         if ($created) {
             $found = Get-ComputerRestorePoint |
                 Where-Object { $_.Description -eq $description }
@@ -154,11 +154,11 @@ $commands = @(
             if ($found) {
                 $ts = [System.Management.ManagementDateTimeConverter]::ToDateTime($found.CreationTime)
                 Update-Messages "? Punto creado y verificado."
-                Update-Messages "   Descripción : $($found.Description)"
+                Update-Messages "   DescripciÃ³n : $($found.Description)"
                 Update-Messages "   Fecha/Hora  : $($ts.ToString('yyyy-MM-dd HH:mm:ss'))"
-                Update-Messages "   Número      : $($found.SequenceNumber)"
+                Update-Messages "   NÃºmero      : $($found.SequenceNumber)"
             } else {
-                Update-Messages "? El punto NO aparece en la lista (falló silenciosamente)."
+                Update-Messages "? El punto NO aparece en la lista (fallÃ³ silenciosamente)."
             }
         }
 
@@ -166,7 +166,7 @@ $commands = @(
         $allPoints = Get-ComputerRestorePoint
         if ($allPoints) {
             Update-Messages "-----------------------------------------"
-            Update-Messages "?? Puntos de restauración existentes: $($allPoints.Count)"
+            Update-Messages "?? Puntos de restauraciÃ³n existentes: $($allPoints.Count)"
             $allPoints | Sort-Object SequenceNumber | ForEach-Object {
                 $ts = [System.Management.ManagementDateTimeConverter]::ToDateTime($_.CreationTime)
                 Update-Messages "   [$($_.SequenceNumber)] $($ts.ToString('yyyy-MM-dd HH:mm:ss')) - $($_.Description)"
@@ -185,7 +185,7 @@ $commands = @(
 @{
     Name     = "003 - Desactivar UAC"
     Action   = {
-        # Verificar ejecución como administrador
+        # Verificar ejecuciÃ³n como administrador
         $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
         if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
             Update-Messages "? Error: Este script requiere ejecutarse como administrador."
@@ -199,7 +199,7 @@ $commands = @(
         try {
             $uac = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "EnableLUA" -ErrorAction Stop
             if ($uac.EnableLUA -eq 0) {
-                Update-Messages "? UAC ya está desactivado."
+                Update-Messages "? UAC ya estÃ¡ desactivado."
             } else {
                 Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "EnableLUA" -Value 0 -ErrorAction Stop
                 Update-Messages "? UAC desactivado. Se requiere reinicio para aplicar."
@@ -218,7 +218,7 @@ $commands = @(
 @{
     Name     = "004 - Instalar Chocolatey"
     Action   = {
-        # Verificar ejecución como administrador
+        # Verificar ejecuciÃ³n como administrador
         $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
         if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
             Update-Messages "? Error: Este script requiere ejecutarse como administrador."
@@ -242,7 +242,7 @@ $commands = @(
                 Update-Messages "? Error instalando Chocolatey: $($_.Exception.Message)"
             }
         } else {
-            Update-Messages "? Chocolatey ya está instalado."
+            Update-Messages "? Chocolatey ya estÃ¡ instalado."
         }
 
         Clear-Messages
@@ -253,7 +253,7 @@ $commands = @(
 # ---------------------------------------
 # OK claude
 @{
-    Name     = "005 - Configurar ajustes avanzados de energía"
+    Name     = "005 - Configurar ajustes avanzados de energÃ­a"
     Action   = {
 
         # --- Funciones locales ---
@@ -277,7 +277,7 @@ $commands = @(
             try {
                 $current = [int](powercfg -getacvalueindex $scheme $sub $setting 2>$null)
                 if ($current -eq $desired) {
-                    Update-Messages "? $desc ya está configurado en $desired."
+                    Update-Messages "? $desc ya estÃ¡ configurado en $desired."
                 } else {
                     powercfg /setacvalueindex $scheme $sub $setting $desired
                     powercfg /setdcvalueindex $scheme $sub $setting $desired
@@ -288,7 +288,7 @@ $commands = @(
             }
         }
 
-        # --- Verificación inicial ---
+        # --- VerificaciÃ³n inicial ---
         Clear-Messages
         Update-Messages "Verificando privilegios de administrador..."
         if (-not (Test-Admin)) {
@@ -296,24 +296,24 @@ $commands = @(
             return
         }
 
-        # --- Crear o activar plan Máximo rendimiento ---
-        Update-Messages "Verificando plan 'Máximo rendimiento'..."
-        $maxPerfName = "Máximo rendimiento"
+        # --- Crear o activar plan MÃ¡ximo rendimiento ---
+        Update-Messages "Verificando plan 'MÃ¡ximo rendimiento'..."
+        $maxPerfName = "MÃ¡ximo rendimiento"
         $output = powercfg /L
 
         if (-not ($output | Where-Object { $_ -like "*$maxPerfName*" })) {
             powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61 | Out-Null
-            Update-Messages "? Plan 'Máximo rendimiento' creado."
+            Update-Messages "? Plan 'MÃ¡ximo rendimiento' creado."
             $output = powercfg /L
         }
 
         $scheme = ($output | Where-Object { $_ -like "*$maxPerfName*" }) `
             -replace '.*:\s+([a-fA-F0-9\-]+).*', '$1'
         powercfg -SetActive $scheme
-        Update-Messages "? Plan 'Máximo rendimiento' activado. GUID: $scheme"
+        Update-Messages "? Plan 'MÃ¡ximo rendimiento' activado. GUID: $scheme"
 
         # --- CPU al 100% ---
-        Exec "CPU mínimo y máximo al 100% (AC y DC)" {
+        Exec "CPU mÃ­nimo y mÃ¡ximo al 100% (AC y DC)" {
             SetIfDifferent $scheme SUB_PROCESSOR PROCTHROTTLEMIN 100 "CPU min AC"
             SetIfDifferent $scheme SUB_PROCESSOR PROCTHROTTLEMAX 100 "CPU max AC"
             powercfg /setdcvalueindex $scheme SUB_PROCESSOR PROCTHROTTLEMIN 100
@@ -327,14 +327,14 @@ $commands = @(
             powercfg /setdcvalueindex $scheme SUB_PROCESSOR PERFBOOSTMODE 1
         }
 
-        # --- Refrigeración activa ---
-        Exec "Activar refrigeración activa (AC y DC)" {
-            SetIfDifferent $scheme SUB_PROCESSOR COOLING_POLICY 0 "Refrigeración AC"
+        # --- RefrigeraciÃ³n activa ---
+        Exec "Activar refrigeraciÃ³n activa (AC y DC)" {
+            SetIfDifferent $scheme SUB_PROCESSOR COOLING_POLICY 0 "RefrigeraciÃ³n AC"
             powercfg /setdcvalueindex $scheme SUB_PROCESSOR COOLING_POLICY 0
         }
 
-        # --- Pantalla, disco y suspensión NUNCA ---
-        Exec "Pantalla, disco y suspensión: NUNCA apagar (AC y DC)" {
+        # --- Pantalla, disco y suspensiÃ³n NUNCA ---
+        Exec "Pantalla, disco y suspensiÃ³n: NUNCA apagar (AC y DC)" {
             powercfg /change monitor-timeout-ac 0
             powercfg /change monitor-timeout-dc 0
             powercfg /change disk-timeout-ac 0
@@ -343,13 +343,13 @@ $commands = @(
             powercfg /change standby-timeout-dc 0
         }
 
-        # --- Hibernación desactivada ---
-        Exec "Deshabilitar hibernación" {
+        # --- HibernaciÃ³n desactivada ---
+        Exec "Deshabilitar hibernaciÃ³n" {
             powercfg -hibernate off
         }
 
-        # --- Suspensión selectiva USB desactivada ---
-        Exec "Deshabilitar suspensión selectiva USB (AC y DC)" {
+        # --- SuspensiÃ³n selectiva USB desactivada ---
+        Exec "Deshabilitar suspensiÃ³n selectiva USB (AC y DC)" {
             $schemeGuid   = (powercfg /GetActiveScheme) -replace '.*GUID:\s+([a-fA-F0-9\-]+).*', '$1'
             $subGroupGuid = "2a737441-1930-4402-8d77-b2bebba308a3"
             $settingGuid  = "4faab71a-92e5-4726-b531-224559672d19"
@@ -370,8 +370,8 @@ $commands = @(
             powercfg /setdcvalueindex $scheme SUB_VIDEO ADAPTBRIGHT 0
         }
 
-        # --- Ahorro energético en red desactivado ---
-        Exec "Deshabilitar ahorro energético en adaptadores de red" {
+        # --- Ahorro energÃ©tico en red desactivado ---
+        Exec "Deshabilitar ahorro energÃ©tico en adaptadores de red" {
             Get-NetAdapter -Physical | ForEach-Object {
                 Disable-NetAdapterPowerManagement -Name $_.Name -NoRestart -Confirm:$false -ErrorAction SilentlyContinue
                 Update-Messages "   ? Red deshabilitada para: $($_.Name)"
@@ -382,7 +382,7 @@ $commands = @(
         powercfg /SETACTIVE $scheme
 
         Update-Messages "-----------------------------------------"
-        Update-Messages "? Todas las configuraciones de energía aplicadas correctamente."
+        Update-Messages "? Todas las configuraciones de energÃ­a aplicadas correctamente."
         Update-Messages "-----------------------------------------"
         Start-Sleep -Seconds 2
         Clear-Messages
@@ -397,18 +397,18 @@ $commands = @(
 if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
 
 @{
-    Name = "006 - Activar características de Windows";
+    Name = "006 - Activar caracterÃ­sticas de Windows";
     Action = {
         Clear-Messages
-        Update-Messages "Iniciando activación de características de Windows..." -ForegroundColor Cyan
+        Update-Messages "Iniciando activaciÃ³n de caracterÃ­sticas de Windows..." -ForegroundColor Cyan
 
-        # Helper para activar características opcionales y manejar errores
+        # Helper para activar caracterÃ­sticas opcionales y manejar errores
         function Enable-FeatureSafe {
             param([string]$FeatureName)
             try {
                 $feat = Get-WindowsOptionalFeature -Online -FeatureName $FeatureName -ErrorAction Stop
                 if ($feat.State -eq 'Enabled') {
-                    Update-Messages "? ${FeatureName} ya está habilitada."
+                    Update-Messages "? ${FeatureName} ya estÃ¡ habilitada."
                 } else {
                     Update-Messages "Activando ${FeatureName}..."
                     # Usa barra real de Windows CMD:
@@ -422,22 +422,22 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             }
         }
 
-        # Verificar si .NET 4.5+ está instalado (no es feature opcional)
+        # Verificar si .NET 4.5+ estÃ¡ instalado (no es feature opcional)
         function Check-Net45 {
             try {
                 $netRegKey = "HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full"
                 $version = (Get-ItemProperty -Path $netRegKey -ErrorAction Stop).Version
                 if ($version -ge "4.5") {
-                    Update-Messages "? .NET Framework 4.5+ detectado: Versión $version"
+                    Update-Messages "? .NET Framework 4.5+ detectado: VersiÃ³n $version"
                 } else {
-                    Update-Messages "? .NET Framework 4.5+ NO DETECTADO. Puede requerir actualización del sistema."
+                    Update-Messages "? .NET Framework 4.5+ NO DETECTADO. Puede requerir actualizaciÃ³n del sistema."
                 }
             } catch {
-                Update-Messages "? No se pudo leer la versión de .NET Framework." -ForegroundColor Yellow
+                Update-Messages "? No se pudo leer la versiÃ³n de .NET Framework." -ForegroundColor Yellow
             }
         }
 
-        # Lista de características a activar
+        # Lista de caracterÃ­sticas a activar
         $features = @(
             "NetFx3",                 # .NET Framework 3.5
             "NetFx4",                 # .NET Framework 4.x
@@ -455,9 +455,9 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
         Check-Net45
 
         # Mensaje final
-        Update-Messages "Proceso completado. Algunas características requieren reinicio." -ForegroundColor Cyan
+        Update-Messages "Proceso completado. Algunas caracterÃ­sticas requieren reinicio." -ForegroundColor Cyan
 
-        # Marcar ejecución
+        # Marcar ejecuciÃ³n
         $script:ExecutedOptions['06'] = $true
         Start-Sleep -Seconds 2
         Clear-Messages
@@ -471,7 +471,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
 if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
 
 @{
-    Name = "007 - Actualización de Windows"
+    Name = "007 - ActualizaciÃ³n de Windows"
     Action = {
         Clear-Messages
 
@@ -498,7 +498,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             )
             $barLength    = 30
             $filledLength = [int]($barLength * $Percent / 100)
-            $bar          = "¦" * $filledLength + "¦" * ($barLength - $filledLength)
+            $bar          = "Â¦" * $filledLength + "Â¦" * ($barLength - $filledLength)
             Update-Messages "[${bar}] ${Percent}% - ${Activity}"
         }
 
@@ -510,7 +510,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
         }
         Update-Messages "? Ejecutando como administrador."
 
-        # --- 2) Instalar proveedor NuGet si no está ---
+        # --- 2) Instalar proveedor NuGet si no estÃ¡ ---
         Show-TextBar -Percent 10 -Activity "Verificando proveedor NuGet..."
         Exec "Verificar/Instalar proveedor NuGet" {
             $nuget = Get-PackageProvider -ListAvailable -ErrorAction SilentlyContinue |
@@ -518,23 +518,23 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             if (-not $nuget) {
                 Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
             } else {
-                Update-Messages "   ? NuGet ya está instalado."
+                Update-Messages "   ? NuGet ya estÃ¡ instalado."
             }
         }
 
-        # --- 3) Instalar PSWindowsUpdate si no está ---
-        Show-TextBar -Percent 20 -Activity "Verificando módulo PSWindowsUpdate..."
-        Exec "Verificar/Instalar módulo PSWindowsUpdate" {
+        # --- 3) Instalar PSWindowsUpdate si no estÃ¡ ---
+        Show-TextBar -Percent 20 -Activity "Verificando mÃ³dulo PSWindowsUpdate..."
+        Exec "Verificar/Instalar mÃ³dulo PSWindowsUpdate" {
             if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) {
                 Install-Module -Name PSWindowsUpdate -Force -AllowClobber -Scope CurrentUser | Out-Null
             } else {
-                Update-Messages "   ? PSWindowsUpdate ya está instalado."
+                Update-Messages "   ? PSWindowsUpdate ya estÃ¡ instalado."
             }
         }
 
-        # --- 4) Importar módulo ---
-        Show-TextBar -Percent 30 -Activity "Importando módulo PSWindowsUpdate..."
-        Exec "Importar módulo PSWindowsUpdate" {
+        # --- 4) Importar mÃ³dulo ---
+        Show-TextBar -Percent 30 -Activity "Importando mÃ³dulo PSWindowsUpdate..."
+        Exec "Importar mÃ³dulo PSWindowsUpdate" {
             Import-Module PSWindowsUpdate -ErrorAction Stop
         }
 
@@ -553,7 +553,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
         if (-not $updates -or $updates.Count -eq 0) {
             Show-TextBar -Percent 100 -Activity "Sin actualizaciones pendientes."
             Update-Messages "-----------------------------------------"
-            Update-Messages "? El sistema está completamente actualizado."
+            Update-Messages "? El sistema estÃ¡ completamente actualizado."
             Update-Messages "-----------------------------------------"
             Start-Sleep -Seconds 2
             Clear-Messages
@@ -570,7 +570,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
         Update-Messages "-----------------------------------------"
 
         # --- 7) Instalar actualizaciones con progreso ---
-        Update-Messages "Iniciando instalación..."
+        Update-Messages "Iniciando instalaciÃ³n..."
         $total   = $updates.Count
         $current = 0
 
@@ -589,7 +589,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
         }
 
         # --- 8) Verificar si requiere reinicio ---
-        Show-TextBar -Percent 100 -Activity "Instalación completada."
+        Show-TextBar -Percent 100 -Activity "InstalaciÃ³n completada."
         Update-Messages "-----------------------------------------"
 
         $rebootRequired = (Get-WURebootStatus -Silent -ErrorAction SilentlyContinue)
@@ -599,7 +599,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             Update-Messages "? No se requiere reinicio."
         }
 
-        Update-Messages "? Proceso de actualización completado. ($total actualizaciones instaladas)"
+        Update-Messages "? Proceso de actualizaciÃ³n completado. ($total actualizaciones instaladas)"
         Update-Messages "-----------------------------------------"
 
         Start-Sleep -Seconds 2
@@ -611,7 +611,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
 # ---------------------------------------  
  # OK
 @{
-    Name     = "008 - Configurar personalización y sistema"
+    Name     = "008 - Configurar personalizaciÃ³n y sistema"
     Action   = {
 
         # --- Funciones locales ---
@@ -648,7 +648,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             }
         }
 
-        # --- Verificación inicial ---
+        # --- VerificaciÃ³n inicial ---
         Clear-Messages
         Update-Messages "Verificando privilegios de administrador..."
         if (-not (Test-Admin)) {
@@ -686,7 +686,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
         }
 
         # --- Ocultar botones de barra de tareas ---
-        Exec "Ocultar botón de búsqueda, contactos y vista de tareas" {
+        Exec "Ocultar botÃ³n de bÃºsqueda, contactos y vista de tareas" {
             $taskbarKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
             Set-ItemProperty -Path $taskbarKey -Name SearchboxTaskbarMode -Type DWord -Value 0 -Force
             Set-ItemProperty -Path $taskbarKey -Name ShowTaskViewButton    -Type DWord -Value 0 -Force
@@ -739,8 +739,8 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             Set-ItemProperty -Path $focusKey -Name NOC_GLOBAL_SETTING_CRITICAL_TOASTS_ENABLED  -Type DWord -Value 0 -Force
         }
 
-        # --- Botón teclado táctil ---
-        Exec "Activar botón del teclado táctil en barra de tareas" {
+        # --- BotÃ³n teclado tÃ¡ctil ---
+        Exec "Activar botÃ³n del teclado tÃ¡ctil en barra de tareas" {
             Safe-SetProperty 'HKCU:\SOFTWARE\Microsoft\TabletTip\1.7' 'EnableDesktopModeAutoInvoke' 1
             Safe-SetProperty 'HKLM:\SOFTWARE\Microsoft\TabletTip\1.7' 'EnableDesktopModeAutoInvoke' 1
         }
@@ -758,13 +758,13 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
         }
 
-        # --- Desactivar telemetría ---
-        Exec "Deshabilitar DiagTrack (telemetría)" {
+        # --- Desactivar telemetrÃ­a ---
+        Exec "Deshabilitar DiagTrack (telemetrÃ­a)" {
             Set-Service  -Name DiagTrack -StartupType Disabled -ErrorAction Stop
             Stop-Service -Name DiagTrack -Force -ErrorAction Stop
         }
 
-        Exec "Deshabilitar dmwappushservice (telemetría)" {
+        Exec "Deshabilitar dmwappushservice (telemetrÃ­a)" {
             Set-Service  -Name dmwappushservice -StartupType Disabled -ErrorAction Stop
             Stop-Service -Name dmwappushservice -Force -ErrorAction Stop
         }
@@ -775,7 +775,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             Set-ItemProperty -Path $reg -Name AllowTelemetry -Type DWord -Value 0 -Force
         }
 
-        # --- Idioma, región y zona horaria ---
+        # --- Idioma, regiÃ³n y zona horaria ---
         Exec "Establecer idioma es-ES, teclado y zona horaria" {
             if (Get-Command Install-Language -ErrorAction SilentlyContinue) {
                 $langs = Get-WinUserLanguageList
@@ -788,7 +788,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
                     Update-Messages "   ? Idioma es-ES ya presente."
                 }
             } else {
-                Update-Messages "   ?? Cmdlets de idioma no disponibles en esta edición."
+                Update-Messages "   ?? Cmdlets de idioma no disponibles en esta ediciÃ³n."
             }
 
             tzutil /s "Romance Standard Time"
@@ -808,7 +808,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
         Restart-Explorer
 
         Update-Messages "-----------------------------------------"
-        Update-Messages "? Todas las configuraciones de personalización aplicadas correctamente."
+        Update-Messages "? Todas las configuraciones de personalizaciÃ³n aplicadas correctamente."
         Update-Messages "-----------------------------------------"
         Start-Sleep -Seconds 2
         Clear-Messages
@@ -819,10 +819,10 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
 # ---------------------------------------  
 
 @{
-    Name = "009 - Configuración inicial del sistema (002-007)"
+    Name = "009 - ConfiguraciÃ³n inicial del sistema (002-007)"
     Action = {
         Clear-Messages
-        Update-Messages "Iniciando configuración inicial del sistema..." -ForegroundColor Cyan
+        Update-Messages "Iniciando configuraciÃ³n inicial del sistema..." -ForegroundColor Cyan
         Update-Messages "Secuencia: 002 ? 003 ? 004 ? 005 ? 006 ? 007"
         Update-Messages "-----------------------------------------"
 
@@ -830,17 +830,17 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             param([int]$Percent, [string]$Activity)
             $barLength    = 30
             $filledLength = [int]($barLength * $Percent / 100)
-            $bar          = "¦" * $filledLength + "¦" * ($barLength - $filledLength)
+            $bar          = "Â¦" * $filledLength + "Â¦" * ($barLength - $filledLength)
             Update-Messages "[${bar}] ${Percent}% - ${Activity}"
         }
 
         $secuencia = @(
-            @{ Orden = "002"; Desc = "Crear punto de restauración" },
+            @{ Orden = "002"; Desc = "Crear punto de restauraciÃ³n" },
             @{ Orden = "003"; Desc = "Desactivar UAC" },
             @{ Orden = "004"; Desc = "Instalar Chocolatey" },
-            @{ Orden = "005"; Desc = "Configurar energía" },
-            @{ Orden = "006"; Desc = "Configurar personalización" },
-            @{ Orden = "007"; Desc = "Actualización de Windows" }
+            @{ Orden = "005"; Desc = "Configurar energÃ­a" },
+            @{ Orden = "006"; Desc = "Configurar personalizaciÃ³n" },
+            @{ Orden = "007"; Desc = "ActualizaciÃ³n de Windows" }
         )
 
         $total   = $secuencia.Count
@@ -856,7 +856,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             $cmd = $commands | Where-Object { $_.Name -match "^$($paso.Orden)\s*-" } | Select-Object -First 1
 
             if ($null -eq $cmd) {
-                Update-Messages "   ?? Módulo $($paso.Orden) no encontrado, omitiendo."
+                Update-Messages "   ?? MÃ³dulo $($paso.Orden) no encontrado, omitiendo."
                 $errores += $paso.Orden
                 continue
             }
@@ -886,9 +886,9 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
         Update-Messages "-----------------------------------------"
 
         if ($errores.Count -eq 0) {
-            Update-Messages "? Configuración inicial completada sin errores." -ForegroundColor Cyan
+            Update-Messages "? ConfiguraciÃ³n inicial completada sin errores." -ForegroundColor Cyan
         } else {
-            Update-Messages "?? Completado con $($errores.Count) error(es). Revisa los módulos marcados." -ForegroundColor Yellow
+            Update-Messages "?? Completado con $($errores.Count) error(es). Revisa los mÃ³dulos marcados." -ForegroundColor Yellow
         }
 
         Start-Sleep -Seconds 2
@@ -909,11 +909,11 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
     Name = "110 - Instalar software esencial (con Office 365)"
     Action = {
         Clear-Messages
-        Update-Messages "Iniciando instalación de software esencial (con Office 365)..." -ForegroundColor Cyan
+        Update-Messages "Iniciando instalaciÃ³n de software esencial (con Office 365)..." -ForegroundColor Cyan
 
         $chocoPath = "$env:ProgramData\chocolatey\bin\choco.exe"
         if (-not (Test-Path $chocoPath)) {
-            Update-Messages "? ERROR: Chocolatey no está instalado. Ejecuta primero la opción 004." -ForegroundColor Red
+            Update-Messages "? ERROR: Chocolatey no estÃ¡ instalado. Ejecuta primero la opciÃ³n 004." -ForegroundColor Red
             return
         }
 
@@ -921,7 +921,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             param([int]$Percent, [string]$Activity)
             $barLength    = 30
             $filledLength = [int]($barLength * $Percent / 100)
-            $bar          = "¦" * $filledLength + "¦" * ($barLength - $filledLength)
+            $bar          = "Â¦" * $filledLength + "Â¦" * ($barLength - $filledLength)
             Update-Messages "[${bar}] ${Percent}% - ${Activity}"
         }
 
@@ -940,7 +940,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             }
 
             if ($instalado) {
-                Update-Messages "   ? $Nombre ya está instalado."
+                Update-Messages "   ? $Nombre ya estÃ¡ instalado."
                 return
             }
 
@@ -949,7 +949,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
 
             if ($LASTEXITCODE -eq 0) {
                 Update-Messages "   ? $Nombre instalado correctamente."
-                # Eliminar solo el icono del programa recién instalado
+                # Eliminar solo el icono del programa reciÃ©n instalado
                 foreach ($desk in @(
                     [Environment]::GetFolderPath("CommonDesktopDirectory"),
                     [Environment]::GetFolderPath("Desktop")
@@ -987,7 +987,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             Install-Choco -Nombre $prog.Nombre -Paquete $prog.Paquete -CheckPath $prog.CheckPath
         }
 
-        Show-TextBar -Percent 100 -Activity "Instalación completada."
+        Show-TextBar -Percent 100 -Activity "InstalaciÃ³n completada."
         Update-Messages "-----------------------------------------"
         Update-Messages "? Software esencial (con Office 365) instalado correctamente."
         Update-Messages "-----------------------------------------"
@@ -1003,11 +1003,11 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
     Name = "111 - Instalar software esencial (con LibreOffice)"
     Action = {
         Clear-Messages
-        Update-Messages "Iniciando instalación de software esencial (con LibreOffice)..." -ForegroundColor Cyan
+        Update-Messages "Iniciando instalaciÃ³n de software esencial (con LibreOffice)..." -ForegroundColor Cyan
 
         $chocoPath = "$env:ProgramData\chocolatey\bin\choco.exe"
         if (-not (Test-Path $chocoPath)) {
-            Update-Messages "? ERROR: Chocolatey no está instalado. Ejecuta primero la opción 004." -ForegroundColor Red
+            Update-Messages "? ERROR: Chocolatey no estÃ¡ instalado. Ejecuta primero la opciÃ³n 004." -ForegroundColor Red
             return
         }
 
@@ -1015,7 +1015,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             param([int]$Percent, [string]$Activity)
             $barLength    = 30
             $filledLength = [int]($barLength * $Percent / 100)
-            $bar          = "¦" * $filledLength + "¦" * ($barLength - $filledLength)
+            $bar          = "Â¦" * $filledLength + "Â¦" * ($barLength - $filledLength)
             Update-Messages "[${bar}] ${Percent}% - ${Activity}"
         }
 
@@ -1034,7 +1034,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             }
 
             if ($instalado) {
-                Update-Messages "   ? $Nombre ya está instalado."
+                Update-Messages "   ? $Nombre ya estÃ¡ instalado."
                 return
             }
 
@@ -1043,7 +1043,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
 
             if ($LASTEXITCODE -eq 0) {
                 Update-Messages "   ? $Nombre instalado correctamente."
-                # Eliminar solo el icono del programa recién instalado
+                # Eliminar solo el icono del programa reciÃ©n instalado
                 foreach ($desk in @(
                     [Environment]::GetFolderPath("CommonDesktopDirectory"),
                     [Environment]::GetFolderPath("Desktop")
@@ -1081,7 +1081,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             Install-Choco -Nombre $prog.Nombre -Paquete $prog.Paquete -CheckPath $prog.CheckPath
         }
 
-        Show-TextBar -Percent 100 -Activity "Instalación completada."
+        Show-TextBar -Percent 100 -Activity "InstalaciÃ³n completada."
         Update-Messages "-----------------------------------------"
         Update-Messages "? Software esencial (con LibreOffice) instalado correctamente."
         Update-Messages "-----------------------------------------"
@@ -1097,11 +1097,11 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
     Name = "112 - Instalar entorno de desarrollo (Node.js, npm, pnpm, Git)"
     Action = {
         Clear-Messages
-        Update-Messages "Iniciando instalación de entorno de desarrollo..." -ForegroundColor Cyan
+        Update-Messages "Iniciando instalaciÃ³n de entorno de desarrollo..." -ForegroundColor Cyan
 
         $chocoPath = "$env:ProgramData\chocolatey\bin\choco.exe"
         if (-not (Test-Path $chocoPath)) {
-            Update-Messages "? ERROR: Chocolatey no está instalado. Ejecuta primero la opción 004." -ForegroundColor Red
+            Update-Messages "? ERROR: Chocolatey no estÃ¡ instalado. Ejecuta primero la opciÃ³n 004." -ForegroundColor Red
             return
         }
 
@@ -1109,7 +1109,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             param([int]$Percent, [string]$Activity)
             $barLength    = 30
             $filledLength = [int]($barLength * $Percent / 100)
-            $bar          = "¦" * $filledLength + "¦" * ($barLength - $filledLength)
+            $bar          = "Â¦" * $filledLength + "Â¦" * ($barLength - $filledLength)
             Update-Messages "[${bar}] ${Percent}% - ${Activity}"
         }
 
@@ -1124,7 +1124,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
             }
 
             if ($instalado) {
-                Update-Messages "   ? $Nombre ya está instalado."
+                Update-Messages "   ? $Nombre ya estÃ¡ instalado."
                 return
             }
 
@@ -1153,12 +1153,12 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
         Install-Choco -Nombre "Node.js" -Paquete "nodejs-lts" `
             -CheckPath "$env:ProgramFiles\nodejs\node.exe"
 
-        # Refrescar PATH para que npm esté disponible
+        # Refrescar PATH para que npm estÃ© disponible
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
                     [System.Environment]::GetEnvironmentVariable("Path","User")
 
-        # --- 2) npm (actualizar a última versión) ---
-        Show-TextBar -Percent 35 -Activity "Actualizando npm a última versión..."
+        # --- 2) npm (actualizar a Ãºltima versiÃ³n) ---
+        Show-TextBar -Percent 35 -Activity "Actualizando npm a Ãºltima versiÃ³n..."
         try {
             $npmVersion = & npm --version 2>$null
             if ($npmVersion) {
@@ -1178,7 +1178,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
         try {
             $pnpmVersion = & pnpm --version 2>$null
             if ($pnpmVersion) {
-                Update-Messages "   ? pnpm ya está instalado v$pnpmVersion"
+                Update-Messages "   ? pnpm ya estÃ¡ instalado v$pnpmVersion"
             } else {
                 Update-Messages "   ?? Instalando pnpm..."
                 & npm install -g pnpm 2>&1 | Out-Null
@@ -1199,7 +1199,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
                     [System.Environment]::GetEnvironmentVariable("Path","User")
 
         # --- Resumen de versiones instaladas ---
-        Show-TextBar -Percent 100 -Activity "Instalación completada."
+        Show-TextBar -Percent 100 -Activity "InstalaciÃ³n completada."
         Update-Messages "-----------------------------------------"
         Update-Messages "?? Versiones instaladas:"
         try { Update-Messages "   Node.js : $(& node --version 2>$null)" } catch {}
@@ -1222,7 +1222,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
     Action = {
         if (-not $script:Task11Started) {
             Clear-Messages
-            Update-Messages "Iniciando descarga y configuración de Snappy Driver Installer (7z)..." -ForegroundColor Yellow
+            Update-Messages "Iniciando descarga y configuraciÃ³n de Snappy Driver Installer (7z)..." -ForegroundColor Yellow
             $script:Task11Started = $true
         }
 
@@ -1241,14 +1241,14 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
 
         # Validar archivo
         if (-not (Test-Path $output7z)) {
-            throw "? No se encontró el archivo descargado."
+            throw "? No se encontrÃ³ el archivo descargado."
         }
         $size = (Get-Item $output7z).Length
         if ($size -lt 1024) {
-            throw "? El archivo descargado es demasiado pequeño (${size} bytes), probablemente está corrupto."
+            throw "? El archivo descargado es demasiado pequeÃ±o (${size} bytes), probablemente estÃ¡ corrupto."
         }
 
-        ### PASO 2: Preparar carpeta de extracción ###
+        ### PASO 2: Preparar carpeta de extracciÃ³n ###
         if (Test-Path $extractPath) {
             Remove-Item -Path $extractPath -Recurse -Force -ErrorAction Stop
         }
@@ -1264,12 +1264,12 @@ if (Test-Path $sevenZip) {
         -ArgumentList "x `"$output7z`" -o`"$extractPath`" -y" `
         -Wait -NoNewWindow
 }else {
-                throw "? 7-Zip no encontrado en C:\Program Files\7-Zip\7z.exe. Instálalo primero."
+                throw "? 7-Zip no encontrado en C:\Program Files\7-Zip\7z.exe. InstÃ¡lalo primero."
             }
 
             $archivos = Get-ChildItem -Path $extractPath -Recurse -ErrorAction Stop
             if ($archivos.Count -eq 0) {
-                throw "? La carpeta de destino está vacía. Descompresión fallida."
+                throw "? La carpeta de destino estÃ¡ vacÃ­a. DescompresiÃ³n fallida."
             }
         } catch {
             throw "? Error al descomprimir el archivo: $_"
@@ -1284,7 +1284,7 @@ if (Test-Path $sevenZip) {
             Update-Messages "?? Fallo al mover el 7z a la carpeta destino." -ForegroundColor Red
         }
 
-        ### FINAL: Confirmación ###
+        ### FINAL: ConfirmaciÃ³n ###
         Update-Messages "? Snappy Driver Installer listo en $extractPath" -ForegroundColor Green
         Start-Sleep -Seconds 2
         $script:ExecutedOptions['113'] = $true
@@ -1310,7 +1310,7 @@ if (Test-Path $sevenZip) {
             param([int]$Percent, [string]$Activity)
             $barLength    = 30
             $filledLength = [int]($barLength * $Percent / 100)
-            $bar          = "¦" * $filledLength + "¦" * ($barLength - $filledLength)
+            $bar          = "Â¦" * $filledLength + "Â¦" * ($barLength - $filledLength)
             Update-Messages "[${bar}] ${Percent}% - ${Activity}"
         }
 
@@ -1329,17 +1329,17 @@ if (Test-Path $sevenZip) {
             switch ($disk.MediaType) {
                 'SSD' {
                     $isSSD = $true
-                    Update-Messages "? Unidad C: es SSD. Se omitirá desfragmentación."
+                    Update-Messages "? Unidad C: es SSD. Se omitirÃ¡ desfragmentaciÃ³n."
                 }
                 'HDD' {
-                    Update-Messages "? Unidad C: es HDD. Desfragmentación permitida."
+                    Update-Messages "? Unidad C: es HDD. DesfragmentaciÃ³n permitida."
                 }
                 default {
-                    Update-Messages "?? Tipo de medio desconocido ($tipoDs). Se omitirá desfragmentación por seguridad."
+                    Update-Messages "?? Tipo de medio desconocido ($tipoDs). Se omitirÃ¡ desfragmentaciÃ³n por seguridad."
                 }
             }
         } catch {
-            Update-Messages "?? Error detectando tipo de disco: $($_.Exception.Message). Se omitirá desfragmentación."
+            Update-Messages "?? Error detectando tipo de disco: $($_.Exception.Message). Se omitirÃ¡ desfragmentaciÃ³n."
         }
 
         # --- 3) Definir tareas DISM + SFC en orden con dependencias ---
@@ -1354,7 +1354,7 @@ if (Test-Path $sevenZip) {
             $output = DISM.exe /Online /Cleanup-Image /CheckHealth 2>&1
             $output | ForEach-Object { Update-Messages "   $_" }
             if ($LASTEXITCODE -ne 0) {
-                Update-Messages "?? CheckHealth detectó problemas (código $LASTEXITCODE). Continuando con ScanHealth..."
+                Update-Messages "?? CheckHealth detectÃ³ problemas (cÃ³digo $LASTEXITCODE). Continuando con ScanHealth..."
             } else {
                 Update-Messages "? DISM /CheckHealth completado sin errores."
             }
@@ -1371,9 +1371,9 @@ if (Test-Path $sevenZip) {
             $output = DISM.exe /Online /Cleanup-Image /ScanHealth 2>&1
             $output | ForEach-Object { Update-Messages "   $_" }
             if ($LASTEXITCODE -ne 0) {
-                Update-Messages "?? ScanHealth detectó componentes dañados (código $LASTEXITCODE). Ejecutando RestoreHealth..."
+                Update-Messages "?? ScanHealth detectÃ³ componentes daÃ±ados (cÃ³digo $LASTEXITCODE). Ejecutando RestoreHealth..."
             } else {
-                Update-Messages "? DISM /ScanHealth completado. No se detectaron daños."
+                Update-Messages "? DISM /ScanHealth completado. No se detectaron daÃ±os."
                 $saltarRestoreHealth = $false
             }
         } catch {
@@ -1389,7 +1389,7 @@ if (Test-Path $sevenZip) {
             $output = DISM.exe /Online /Cleanup-Image /RestoreHealth 2>&1
             $output | ForEach-Object { Update-Messages "   $_" }
             if ($LASTEXITCODE -ne 0) {
-                Update-Messages "? RestoreHealth falló (código $LASTEXITCODE)."
+                Update-Messages "? RestoreHealth fallÃ³ (cÃ³digo $LASTEXITCODE)."
                 $errores += "DISM /RestoreHealth"
             } else {
                 Update-Messages "? DISM /RestoreHealth completado correctamente."
@@ -1407,7 +1407,7 @@ if (Test-Path $sevenZip) {
             $output = DISM.exe /Online /Cleanup-Image /StartComponentCleanup 2>&1
             $output | ForEach-Object { Update-Messages "   $_" }
             if ($LASTEXITCODE -ne 0) {
-                Update-Messages "?? StartComponentCleanup finalizó con código $LASTEXITCODE."
+                Update-Messages "?? StartComponentCleanup finalizÃ³ con cÃ³digo $LASTEXITCODE."
             } else {
                 Update-Messages "? DISM /StartComponentCleanup completado."
             }
@@ -1424,28 +1424,28 @@ if (Test-Path $sevenZip) {
             $output = sfc.exe /scannow 2>&1
             $output | ForEach-Object { Update-Messages "   $_" }
             if ($LASTEXITCODE -ne 0) {
-                Update-Messages "?? SFC detectó o no pudo reparar algunos archivos (código $LASTEXITCODE)."
+                Update-Messages "?? SFC detectÃ³ o no pudo reparar algunos archivos (cÃ³digo $LASTEXITCODE)."
                 $errores += "SFC /scannow"
             } else {
-                Update-Messages "? SFC /scannow completado. No se encontraron archivos dañados."
+                Update-Messages "? SFC /scannow completado. No se encontraron archivos daÃ±ados."
             }
         } catch {
             Update-Messages "? Error en SFC /scannow: $($_.Exception.Message)"
             $errores += "SFC /scannow"
         }
 
-        # Desfragmentación solo si es HDD
+        # DesfragmentaciÃ³n solo si es HDD
         if (-not $isSSD -and $tipoDs -ne "Desconocido") {
             Show-TextBar -Percent 90 -Activity "Desfragmentando disco C:"
             Update-Messages "-----------------------------------------"
-            Update-Messages "? Ejecutando desfragmentación de C:..."
+            Update-Messages "? Ejecutando desfragmentaciÃ³n de C:..."
             try {
                 $output = defrag.exe C: /U /V 2>&1
                 $output | ForEach-Object { Update-Messages "   $_" }
-                Update-Messages "? Desfragmentación completada."
+                Update-Messages "? DesfragmentaciÃ³n completada."
             } catch {
-                Update-Messages "? Error en desfragmentación: $($_.Exception.Message)"
-                $errores += "Desfragmentación"
+                Update-Messages "? Error en desfragmentaciÃ³n: $($_.Exception.Message)"
+                $errores += "DesfragmentaciÃ³n"
             }
         } else {
             Show-TextBar -Percent 90 -Activity "Ejecutando TRIM en SSD..."
@@ -1483,7 +1483,7 @@ if (Test-Path $sevenZip) {
             Update-Messages "? Mantenimiento completado sin errores." -ForegroundColor Cyan
         } else {
             Update-Messages "?? Completado con $($errores.Count) error(es). Revisa los pasos marcados." -ForegroundColor Yellow
-            Update-Messages "   ?? Si SFC falló tras RestoreHealth, prueba a reiniciar y ejecutar de nuevo."
+            Update-Messages "   ?? Si SFC fallÃ³ tras RestoreHealth, prueba a reiniciar y ejecutar de nuevo."
         }
 
         $script:ExecutedOptions['210'] = $true
@@ -1499,7 +1499,7 @@ if (Test-Path $sevenZip) {
 $script:ExecutedOptions['22'] = $false
 
 @{
-    Name = "212 - Limpieza avanzada de disco, archivos temporales y puntos de restauración (mejorado)"
+    Name = "212 - Limpieza avanzada de disco, archivos temporales y puntos de restauraciÃ³n (mejorado)"
     Action = {
         Clear-Messages
         Update-Messages "Iniciando limpieza avanzada del sistema..." -ForegroundColor Cyan
@@ -1513,7 +1513,7 @@ $script:ExecutedOptions['22'] = $false
             param([int]$Percent, [string]$Activity)
             $barLength    = 30
             $filledLength = [int]($barLength * $Percent / 100)
-            $bar          = "¦" * $filledLength + "¦" * ($barLength - $filledLength)
+            $bar          = "Â¦" * $filledLength + "Â¦" * ($barLength - $filledLength)
             Update-Messages "[${bar}] ${Percent}% - ${Activity}"
         }
 
@@ -1619,9 +1619,9 @@ $script:ExecutedOptions['22'] = $false
             }
         }
 
-        # --- 4) Caché de navegadores ---
-        Show-TextBar -Percent 32 -Activity "Limpiando caché de navegadores..."
-        Exec "Limpiar caché de navegadores (Chrome, Edge, Firefox)" {
+        # --- 4) CachÃ© de navegadores ---
+        Show-TextBar -Percent 32 -Activity "Limpiando cachÃ© de navegadores..."
+        Exec "Limpiar cachÃ© de navegadores (Chrome, Edge, Firefox)" {
             $excluded = @('All Users','Default','Default User','Public')
             Get-ChildItem C:\Users -Directory -ErrorAction SilentlyContinue |
                 Where-Object { $excluded -notcontains $_.Name } |
@@ -1645,9 +1645,9 @@ $script:ExecutedOptions['22'] = $false
                 }
         }
 
-        # --- 5) Caché de Windows Defender ---
-        Show-TextBar -Percent 40 -Activity "Limpiando caché de Windows Defender..."
-        Exec "Limpiar caché de Windows Defender" {
+        # --- 5) CachÃ© de Windows Defender ---
+        Show-TextBar -Percent 40 -Activity "Limpiando cachÃ© de Windows Defender..."
+        Exec "Limpiar cachÃ© de Windows Defender" {
             $defPaths = @(
                 "$env:ProgramData\Microsoft\Windows Defender\Scans\History\*",
                 "$env:ProgramData\Microsoft\Windows Defender\Support\*"
@@ -1701,9 +1701,9 @@ $script:ExecutedOptions['22'] = $false
             }
         }
 
-        # --- 8) Caché de Microsoft Store ---
-        Show-TextBar -Percent 68 -Activity "Limpiando caché de Microsoft Store..."
-        Exec "Limpiar caché de Microsoft Store (wsreset)" {
+        # --- 8) CachÃ© de Microsoft Store ---
+        Show-TextBar -Percent 68 -Activity "Limpiando cachÃ© de Microsoft Store..."
+        Exec "Limpiar cachÃ© de Microsoft Store (wsreset)" {
             Start-Process -FilePath "wsreset.exe" -Wait -NoNewWindow -ErrorAction SilentlyContinue
         }
 
@@ -1712,13 +1712,13 @@ $script:ExecutedOptions['22'] = $false
         Exec "Limpieza de Component Store con DISM (StartComponentCleanup / ResetBase)" {
             $output = DISM.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase /Quiet 2>&1
             if ($LASTEXITCODE -ne 0) {
-                throw "DISM finalizó con código $LASTEXITCODE"
+                throw "DISM finalizÃ³ con cÃ³digo $LASTEXITCODE"
             }
         }
 
-        # --- 10) Puntos de restauración antiguos (conservar el más reciente) ---
-        Show-TextBar -Percent 86 -Activity "Eliminando puntos de restauración antiguos..."
-        Exec "Eliminar puntos de restauración antiguos (conservar el más reciente)" {
+        # --- 10) Puntos de restauraciÃ³n antiguos (conservar el mÃ¡s reciente) ---
+        Show-TextBar -Percent 86 -Activity "Eliminando puntos de restauraciÃ³n antiguos..."
+        Exec "Eliminar puntos de restauraciÃ³n antiguos (conservar el mÃ¡s reciente)" {
             $allPoints = Get-ComputerRestorePoint -ErrorAction SilentlyContinue
             if ($allPoints -and $allPoints.Count -gt 1) {
                 $sorted   = $allPoints | Sort-Object SequenceNumber
@@ -1732,15 +1732,15 @@ $script:ExecutedOptions['22'] = $false
                 $tsL  = [System.Management.ManagementDateTimeConverter]::ToDateTime($last.CreationTime)
                 Update-Messages "   ? Conservado: [$($last.SequenceNumber)] $($tsL.ToString('yyyy-MM-dd HH:mm:ss')) - $($last.Description)"
             } elseif ($allPoints -and $allPoints.Count -eq 1) {
-                Update-Messages "   ?? Solo hay un punto de restauración, no se elimina nada."
+                Update-Messages "   ?? Solo hay un punto de restauraciÃ³n, no se elimina nada."
             } else {
-                Update-Messages "   ?? No hay puntos de restauración para eliminar."
+                Update-Messages "   ?? No hay puntos de restauraciÃ³n para eliminar."
             }
         }
 
         # --- 11) Optimizar disco ---
         Show-TextBar -Percent 94 -Activity "Optimizando disco C:..."
-        Exec "Optimizar volumen del sistema (TRIM o defrag según corresponda)" {
+        Exec "Optimizar volumen del sistema (TRIM o defrag segÃºn corresponda)" {
             Optimize-Volume -DriveLetter $MeasureDrive -Verbose -ErrorAction Stop | Out-Null
         }
 
@@ -1771,22 +1771,22 @@ $script:ExecutedOptions['22'] = $false
     Name = "220 - Activar Windows";
     Action = {
         Clear-Messages
-        Update-Messages "Activación de Windows..." -ForegroundColor Cyan
+        Update-Messages "ActivaciÃ³n de Windows..." -ForegroundColor Cyan
         
-        # Mostrar opciones al usuario en una sola línea
+        # Mostrar opciones al usuario en una sola lÃ­nea
         $optionsMessage = @"
-Seleccione la versión de Windows para activar:
+Seleccione la versiÃ³n de Windows para activar:
 01 - Windows 10
 02 - Windows 11
 03 - Windows LTSC
-04 - Salir al menú principal
+04 - Salir al menÃº principal
 "@
         Update-Messages $optionsMessage -ForegroundColor Yellow
         
-        # Solicitar al usuario que seleccione una opción
-        $choice = Read-Host "Ingrese el número de la opción (01, 02, 03 o 04)"
+        # Solicitar al usuario que seleccione una opciÃ³n
+        $choice = Read-Host "Ingrese el nÃºmero de la opciÃ³n (01, 02, 03 o 04)"
         
-        # Realizar la activación o salir según la opción seleccionada
+        # Realizar la activaciÃ³n o salir segÃºn la opciÃ³n seleccionada
         switch ($choice) {
             "01" {
                 Update-Messages "Activando Windows 10..." -ForegroundColor Yellow
@@ -1822,18 +1822,18 @@ Seleccione la versión de Windows para activar:
                 }
             }
             "04" {
-                Update-Messages "Saliendo al menú principal..." -ForegroundColor Cyan
+                Update-Messages "Saliendo al menÃº principal..." -ForegroundColor Cyan
                 Start-Sleep -Seconds 2
                 Clear-Messages
                 return
             }
             default {
-                Update-Messages "Opción no válida. Por favor, seleccione una opción válida." -ForegroundColor Red
+                Update-Messages "OpciÃ³n no vÃ¡lida. Por favor, seleccione una opciÃ³n vÃ¡lida." -ForegroundColor Red
             }
         }
         
-        # Mensaje final y regresar al menú principal
-        Update-Messages "Proceso de activación completado. Volviendo al menú principal..." -ForegroundColor Cyan
+        # Mensaje final y regresar al menÃº principal
+        Update-Messages "Proceso de activaciÃ³n completado. Volviendo al menÃº principal..." -ForegroundColor Cyan
         Start-Sleep -Seconds 2
         Clear-Messages
     };
@@ -1846,12 +1846,12 @@ Seleccione la versión de Windows para activar:
 if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
 
 @{
-    Name = "260 - Reiniciar la cola de impresión";
+    Name = "260 - Reiniciar la cola de impresiÃ³n";
     Action = {
         Clear-Messages
-        Update-Messages "Iniciando el reinicio de la cola de impresión..." -ForegroundColor Cyan
+        Update-Messages "Iniciando el reinicio de la cola de impresiÃ³n..." -ForegroundColor Cyan
 
-        # Helper genérico para pasos con mensajes y errores
+        # Helper genÃ©rico para pasos con mensajes y errores
         function Exec {
             param([string]$Desc, [scriptblock]$Code)
             Update-Messages "$Desc..." -ForegroundColor Yellow
@@ -1863,7 +1863,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
             }
         }
 
-        # 1) Detener el servicio de cola de impresión
+        # 1) Detener el servicio de cola de impresiÃ³n
         Exec "Detener servicio Spooler" {
             Stop-Service -Name Spooler -Force -ErrorAction Stop
         }
@@ -1872,7 +1872,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
         Exec "Eliminar trabajos pendientes" {
             $spoolPath = "$env:windir\System32\spool\PRINTERS"
             if (Test-Path $spoolPath) {
-                # Tomar propiedad y permisos para asegurar eliminación
+                # Tomar propiedad y permisos para asegurar eliminaciÃ³n
                 takeown /F $spoolPath /R /D Y | Out-Null
                 icacls $spoolPath /grant Administrators:F /T | Out-Null
                 Remove-Item -Path "$spoolPath\*.*" -Recurse -Force -ErrorAction Stop
@@ -1881,12 +1881,12 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
             }
         }
 
-        # 3) Iniciar el servicio de cola de impresión
+        # 3) Iniciar el servicio de cola de impresiÃ³n
         Exec "Iniciar servicio Spooler" {
             Start-Service -Name Spooler -ErrorAction Stop
         }
 
-        Update-Messages "Reinicio de la cola de impresión finalizado." -ForegroundColor Cyan
+        Update-Messages "Reinicio de la cola de impresiÃ³n finalizado." -ForegroundColor Cyan
         Clear-Messages
         $script:ExecutedOptions['26'] = $true
     };
@@ -1902,7 +1902,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
     Name = "270 - Verificar la memoria RAM"
     Action = {
         Clear-Messages
-        Update-Messages "Iniciando programación de diagnóstico de memoria RAM..." -ForegroundColor Cyan
+        Update-Messages "Iniciando programaciÃ³n de diagnÃ³stico de memoria RAM..." -ForegroundColor Cyan
 
         function Test-Admin {
             return ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).
@@ -1938,10 +1938,10 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
             }
             Update-Messages "-----------------------------------------"
         } catch {
-            Update-Messages "?? No se pudo obtener información de RAM: $($_.Exception.Message)"
+            Update-Messages "?? No se pudo obtener informaciÃ³n de RAM: $($_.Exception.Message)"
         }
 
-        # --- 3) Mostrar resultados del último diagnóstico si existen ---
+        # --- 3) Mostrar resultados del Ãºltimo diagnÃ³stico si existen ---
         try {
             $eventos = Get-WinEvent -LogName "System" -ErrorAction Stop |
                 Where-Object { $_.ProviderName -eq "Microsoft-Windows-MemoryDiagnostics-Results" } |
@@ -1949,50 +1949,50 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
 
             if ($eventos) {
                 Update-Messages "-----------------------------------------"
-                Update-Messages "?? Último diagnóstico de RAM ejecutado:"
+                Update-Messages "?? Ãšltimo diagnÃ³stico de RAM ejecutado:"
                 Update-Messages "   Fecha  : $($eventos.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss'))"
                 Update-Messages "   Resultado: $($eventos.Message)"
                 Update-Messages "-----------------------------------------"
             } else {
-                Update-Messages "??  No se encontraron diagnósticos previos de RAM."
+                Update-Messages "??  No se encontraron diagnÃ³sticos previos de RAM."
             }
         } catch {
-            Update-Messages "??  No se encontraron diagnósticos previos de RAM."
+            Update-Messages "??  No se encontraron diagnÃ³sticos previos de RAM."
         }
 
-        # --- 4) Programar diagnóstico via BCDEdit ---
+        # --- 4) Programar diagnÃ³stico via BCDEdit ---
         $bcdeditOk = $false
         Exec "Programar Windows Memory Diagnostic en arranque" {
             $result = bcdedit /bootsequence "{memdiag}" 2>&1
             if ($LASTEXITCODE -eq 0) {
                 $bcdeditOk = $true
             } else {
-                throw "BCDEdit falló: $result"
+                throw "BCDEdit fallÃ³: $result"
             }
         }
 
-        # --- 5) Verificar que quedó configurado ---
+        # --- 5) Verificar que quedÃ³ configurado ---
         if ($bcdeditOk) {
-            Exec "Verificar configuración de arranque" {
+            Exec "Verificar configuraciÃ³n de arranque" {
                 $seq = bcdedit /enum "{current}" 2>&1 | Select-String "bootsequence"
                 if ($seq -and $seq -match "{memdiag}") {
                     Update-Messages "   ? {memdiag} confirmado en bootsequence."
                 } else {
-                    throw "No se encontró {memdiag} en bootsequence."
+                    throw "No se encontrÃ³ {memdiag} en bootsequence."
                 }
             }
         } else {
-            # Fallback SOLO si BCDEdit falló
-            Update-Messages "?? BCDEdit falló, usando registro como alternativa..." -ForegroundColor Yellow
+            # Fallback SOLO si BCDEdit fallÃ³
+            Update-Messages "?? BCDEdit fallÃ³, usando registro como alternativa..." -ForegroundColor Yellow
             try {
                 $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager"
                 $current = (Get-ItemProperty -Path $regPath -Name BootExecute).BootExecute
                 if ($current -notcontains "memdiag") {
                     Set-ItemProperty -Path $regPath -Name BootExecute `
                         -Value ($current + "memdiag") -Force
-                    Update-Messages "? Diagnóstico programado via registro."
+                    Update-Messages "? DiagnÃ³stico programado via registro."
                 } else {
-                    Update-Messages "? Diagnóstico ya estaba programado via registro."
+                    Update-Messages "? DiagnÃ³stico ya estaba programado via registro."
                 }
             } catch {
                 Update-Messages "? Error en fallback: $($_.Exception.Message)"
@@ -2001,19 +2001,19 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
 
         # --- 6) Preguntar si reiniciar ahora ---
         Update-Messages "-----------------------------------------"
-        Update-Messages "??  El diagnóstico requiere reinicio para ejecutarse."
+        Update-Messages "??  El diagnÃ³stico requiere reinicio para ejecutarse."
         Update-Messages "-----------------------------------------"
-        $respuesta = Read-Host "¿Deseas reiniciar ahora para ejecutar la prueba? (S/N)"
+        $respuesta = Read-Host "Â¿Deseas reiniciar ahora para ejecutar la prueba? (S/N)"
 
         if ($respuesta -eq "S" -or $respuesta -eq "s") {
             Update-Messages "?? Reiniciando el equipo en 10 segundos..."
-            Update-Messages "   Cierra cualquier aplicación abierta."
+            Update-Messages "   Cierra cualquier aplicaciÃ³n abierta."
             Start-Sleep -Seconds 10
             Restart-Computer -Force -Confirm:$false
         } else {
             Update-Messages "-----------------------------------------"
-            Update-Messages "??  El diagnóstico se ejecutará en el próximo reinicio."
-            Update-Messages "   Los resultados estarán en el Visor de eventos:"
+            Update-Messages "??  El diagnÃ³stico se ejecutarÃ¡ en el prÃ³ximo reinicio."
+            Update-Messages "   Los resultados estarÃ¡n en el Visor de eventos:"
             Update-Messages "   ? Registros de Windows ? Sistema ? MemoryDiagnostics-Results"
             Update-Messages "-----------------------------------------"
         }
@@ -2035,10 +2035,10 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
 # --------------------------------------- 
 
 @{
-    Name = "300 - Crear impresoras genéricas BARRA y COCINA";
+    Name = "300 - Crear impresoras genÃ©ricas BARRA y COCINA";
     Action = {
         Clear-Messages
-        Update-Messages "Iniciando creación de impresoras genéricas..." -ForegroundColor Yellow
+        Update-Messages "Iniciando creaciÃ³n de impresoras genÃ©ricas..." -ForegroundColor Yellow
 
         try {
             # Datos para las impresoras
@@ -2059,13 +2059,13 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
                     Update-Messages "El puerto $($printer.Port) ya existe. Continuando..." -ForegroundColor Yellow
                 }
 
-                # Verificar si el controlador genérico está instalado
+                # Verificar si el controlador genÃ©rico estÃ¡ instalado
                 if (-not (Get-PrinterDriver -Name $driverName -ErrorAction SilentlyContinue)) {
-                    Update-Messages "Instalando controlador genérico: $driverName..." -ForegroundColor Cyan
+                    Update-Messages "Instalando controlador genÃ©rico: $driverName..." -ForegroundColor Cyan
                     Add-PrinterDriver -Name $driverName
-                    Update-Messages "Controlador genérico instalado correctamente." -ForegroundColor Green
+                    Update-Messages "Controlador genÃ©rico instalado correctamente." -ForegroundColor Green
                 } else {
-                    Update-Messages "El controlador $driverName ya está instalado. Continuando..." -ForegroundColor Yellow
+                    Update-Messages "El controlador $driverName ya estÃ¡ instalado. Continuando..." -ForegroundColor Yellow
                 }
 
                 # Crear la impresora
@@ -2075,7 +2075,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
             }
 
         } catch {
-            Update-Messages "Error durante la creación de las impresoras: $($_.Exception.Message)" -ForegroundColor Red
+            Update-Messages "Error durante la creaciÃ³n de las impresoras: $($_.Exception.Message)" -ForegroundColor Red
         }
 
         Clear-Messages
@@ -2094,7 +2094,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
         Name = "990 - Salir";
         Action = {
             Clear-Messages
-            Update-Messages "Saliendo del menú..."
+            Update-Messages "Saliendo del menÃº..."
             Start-Sleep -Seconds 1
             exit
         };
@@ -2111,17 +2111,17 @@ $global:menuDisplayed = $false
 # ---------------------------------------
 function Show-Menu {
     cls
-    Write-Host "=========== Menú Principal ===========" -ForegroundColor Cyan
+    Write-Host "=========== MenÃº Principal ===========" -ForegroundColor Cyan
     foreach ($command in $commands) {
         if ($command.Executed) {
             Write-Host $command.Name -ForegroundColor Green
         } elseif ($command.Name -like "10*") {
-            Write-Host $command.Name -ForegroundColor Red  # Color rojo para la opción 10
+            Write-Host $command.Name -ForegroundColor Red  # Color rojo para la opciÃ³n 10
         } else {
             Write-Host $command.Name -ForegroundColor Yellow
         }
 
-        # Separadores específicos
+        # Separadores especÃ­ficos
         if ($command.Name -like "009*") {
             Write-Host "======================================" -ForegroundColor Blue
         }
@@ -2155,7 +2155,7 @@ if ($command.Name -like "40*") {
 
 # ---------------------------------------
 
-# Función para actualizar los mensajes
+# FunciÃ³n para actualizar los mensajes
 function Update-Messages {
     param (
         [string]$Message
@@ -2167,7 +2167,7 @@ function Update-Messages {
 }
 # ---------------------------------------
 
-# Función para limpiar los mensajes
+# FunciÃ³n para limpiar los mensajes
 function Clear-Messages {
     $global:messages = @()
     Show-Menu
@@ -2176,11 +2176,11 @@ function Clear-Messages {
 
 # ---------------------------------------
 
-# Función principal del menú
+# FunciÃ³n principal del menÃº
 function Main-Menu {
     while ($true) {
         Show-Menu
-        $choice = Read-Host "Selecciona una opción"
+        $choice = Read-Host "Selecciona una opciÃ³n"
 
         # Buscar el comando seleccionado
         $selectedCommand = $commands | Where-Object { $_.Name -like "$choice*" }
@@ -2189,13 +2189,13 @@ function Main-Menu {
             & $selectedCommand.Action
         } else {
             Clear-Messages
-            Update-Messages "Opción inválida, intenta nuevamente."
+            Update-Messages "OpciÃ³n invÃ¡lida, intenta nuevamente."
         }
     }
 }
 # ---------------------------------------
 
-# Ejecutar el menú
+# Ejecutar el menÃº
 Main-Menu
 # ---------------------------------------
 
