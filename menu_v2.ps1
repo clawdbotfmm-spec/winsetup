@@ -1,3 +1,4 @@
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 # SOLO muestra el prompt para salir, no repite ninguna acción ni mensaje.
 #        do {
 #            $tecla = Read-Host "Pulsa 'q' y Enter para volver al menú principal..."
