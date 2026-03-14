@@ -1296,19 +1296,43 @@ if (Test-Path $sevenZip) {
 # --------------------------------------- 
 
 @{
-    Name   = "114 - Instalar Ollama (Chocolatey)"
-    Action = {
-        try {
-            Clear-Messages
-            Update-Messages "Instalando Ollama mediante Chocolatey..."
+    Name     = "114 - Instalar Ollama y descargar GLM-5:cloud"
+    Action   = {
+        Clear-Messages
+        Update-Messages "Iniciando instalación de Ollama y configuración de modelo..." -ForegroundColor Cyan
 
-            choco install ollama -y
+        # 1. Verificar e Instalar Ollama
+        if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
+            Update-Messages "?? Ollama no detectado. Descargando instalador oficial..."
+            try {
+                # Ejecuta el script de instalación oficial de Ollama para Windows
+                irm https://ollama.com/install.ps1 | iex
+                Update-Messages "?? Instalación finalizada. Refrescando variables de entorno..."
+                
+                # Intentar refrescar el Path para la sesión actual
+                $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            } catch {
+                Update-Messages "? Error al instalar Ollama: $($_.Exception.Message)"
+                return
+            }
+        } else {
+            Update-Messages "? Ollama ya está instalado."
+        }
 
-            Update-Messages "Ollama instalado correctamente."
+        # 2. Descargar y cargar el modelo glm-5:cloud
+        Update-Messages "?? Descargando el modelo 'glm-5:cloud' (esto puede tardar varios minutos)..."
+        
+        # Se usa 'pull' para descargarlo y dejarlo listo en el servidor
+        & ollama pull glm-5:cloud
+
+        if ($LASTEXITCODE -eq 0) {
+            Update-Messages "? Modelo 'glm-5:cloud' cargado correctamente en Ollama."
+        } else {
+            Update-Messages "? Error al descargar el modelo. Verifica tu conexión o el nombre del tag."
         }
-        catch {
-            Update-Messages "Error durante la instalación de Ollama: $($_.Exception.Message)"
-        }
+
+        Start-Sleep -Seconds 3
+        Clear-Messages
     }
     Executed = $false
 }
@@ -1316,19 +1340,25 @@ if (Test-Path $sevenZip) {
 # --------------------------------------- 
 
 @{
-    Name   = "115 - Instalar OpenClaw"
-    Action = {
-        try {
-            Clear-Messages
-            Update-Messages "Descargando e instalando OpenClaw..."
-
-            iwr -useb https://openclaw.ai/install.ps1 | iex
-
-            Update-Messages "OpenClaw instalado correctamente."
+    Name     = "115 - Instalar Telegram Desktop (Chocolatey)"
+    Action   = {
+        Clear-Messages
+        Update-Messages "Iniciando instalación de Telegram Desktop..."
+        
+        if (Get-Command choco -ErrorAction SilentlyContinue) {
+            try {
+                Update-Messages "?? Ejecutando: choco install telegram -y"
+                choco install telegram -y
+                Update-Messages "? Telegram instalado correctamente."
+            } catch {
+                Update-Messages "? Error al instalar Telegram: $($_.Exception.Message)"
+            }
+        } else {
+            Update-Messages "? Error: Chocolatey no detectado. Instálalo primero con la opción 004."
         }
-        catch {
-            Update-Messages "Error instalando OpenClaw: $($_.Exception.Message)"
-        }
+        
+        Start-Sleep -Seconds 3
+        Clear-Messages
     }
     Executed = $false
 }
