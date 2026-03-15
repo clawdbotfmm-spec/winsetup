@@ -1639,45 +1639,60 @@ $commands = @(
             Update-Messages "✅ 7-Zip ya está instalado."
         }
 
-        # --- 3) Obtener la última versión de SDI Lite desde GitHub ---
+        # --- 3) Obtener la última versión de SDI Lite desde driveroff.net ---
         Update-Messages "⏳ Buscando última versión de SDI Lite..."
         $downloadUrl = $null
         $fileName    = $null
         try {
-            $apiUrl   = "https://api.github.com/repos/gtumanyan/SDI/releases/latest"
-            $headers  = @{ "User-Agent" = "PowerShell" }
-            $release  = Invoke-RestMethod -Uri $apiUrl -Headers $headers -ErrorAction Stop
-            $asset    = $release.assets | Where-Object { $_.name -like "SDI_R*.7z" } | Select-Object -First 1
-            if (-not $asset) {
-                Update-Messages "❌ No se encontró el archivo SDI_R*.7z en la última release."
-                return
+            $page = Invoke-WebRequest -Uri "http://driveroff.net/drv/" -UseBasicParsing -ErrorAction Stop
+            # Buscar todos los links que coincidan con SDI_R*.7z
+            $links = $page.Links | Where-Object { $_.href -match "SDI_R\d+\.7z" }
+            if (-not $links) {
+                # Fallback: buscar con regex en el contenido
+                $matches = [regex]::Matches($page.Content, 'SDI_R(\d+)\.7z')
+                if ($matches.Count -gt 0) {
+                    $versions = $matches | ForEach-Object { [int]$_.Groups[1].Value } | Sort-Object -Descending
+                    $fileName = "SDI_R$($versions[0]).7z"
+                    $downloadUrl = "http://driveroff.net/drv/$fileName"
+                }
+            } else {
+                $latest = $links | Sort-Object { [regex]::Match($_.href, '\d+').Value -as [int] } -Descending | Select-Object -First 1
+                $fileName = $latest.href -replace '.*/(\S+\.7z).*','$1'
+                $downloadUrl = "http://driveroff.net/drv/$fileName"
             }
-            $downloadUrl = $asset.browser_download_url
-            $fileName    = $asset.name
-            Update-Messages "✅ Última versión encontrada: $fileName"
+
+            if (-not $downloadUrl) {
+                # Fallback a versión conocida
+                $fileName    = "SDI_R2601.7z"
+                $downloadUrl = "http://driveroff.net/drv/$fileName"
+                Update-Messages "⚠️ No se pudo detectar la versión, usando: $fileName"
+            } else {
+                Update-Messages "✅ Última versión encontrada: $fileName"
+            }
         } catch {
-            Update-Messages "❌ Error consultando GitHub: $($_.Exception.Message)"
-            return
+            # Fallback a versión conocida
+            $fileName    = "SDI_R2601.7z"
+            $downloadUrl = "http://driveroff.net/drv/$fileName"
+            Update-Messages "⚠️ Error al buscar versión online, usando: $fileName"
         }
 
-        # --- 4) Descargar SDI Lite ---
+        # --- 4) Buscar primero en Downloads de cualquier usuario ---
         $destFile = "C:\$fileName"
-        if (-not (Test-Path $destFile)) {
+        $foundLocal = Get-ChildItem "C:\Users\*\Downloads\$fileName" -ErrorAction SilentlyContinue | Select-Object -First 1
+
+        if ($foundLocal) {
+            Update-Messages "✅ Encontrado en Downloads: $($foundLocal.FullName)"
+            Copy-Item $foundLocal.FullName $destFile -Force
+            Update-Messages "✅ Copiado a C:\"
+        } elseif (-not (Test-Path $destFile)) {
             Update-Messages "⏳ Descargando $fileName ..."
             try {
                 Invoke-WebRequest -Uri $downloadUrl -OutFile $destFile -UseBasicParsing -ErrorAction Stop
                 Update-Messages "✅ Descarga completada."
             } catch {
-                # Intentar copiar desde Downloads de cualquier usuario
-                Update-Messages "⚠️ Descarga directa fallida. Buscando en carpetas de usuario..."
-                $found = Get-ChildItem "C:\Users\*\Downloads\$fileName" -ErrorAction SilentlyContinue | Select-Object -First 1
-                if ($found) {
-                    Copy-Item $found.FullName $destFile -Force
-                    Update-Messages "✅ Copiado desde: $($found.FullName)"
-                } else {
-                    Update-Messages "❌ No se encontró el archivo en ninguna carpeta de Downloads."
-                    return
-                }
+                Update-Messages "❌ Error al descargar: $($_.Exception.Message)"
+                Update-Messages "   Descarga manual: $downloadUrl"
+                return
             }
         } else {
             Update-Messages "✅ Archivo ya existe en C:\, omitiendo descarga."
@@ -1736,7 +1751,6 @@ $commands = @(
     }
     Executed = $false
 }
-
 # ---------------------------------------
 # OK - claude
 @{
