@@ -15,26 +15,9 @@ try {
 } catch {}
 
 # 2. Configuración de ubicación y variables globales
-Set-Location -LiteralPath $PSScriptRoot
+if ($PSScriptRoot) { Set-Location -LiteralPath $PSScriptRoot }
 if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{} }
 $global:messages = @()
-
-# SOLO muestra el prompt para salir, no repite ninguna acción ni mensaje.
-#        do {
-#            $tecla = Read-Host "Pulsa 'q' y Enter para volver al menú principal..."
-#       } while ($tecla -ne 'q')
-
-# PAUSA para que el usuario vea el resultado antes de limpiar
-   #     Read-Host "`nPresiona ENTER para continuar..."
-# En menu.ps1, al principio:
-Set-Location -LiteralPath $PSScriptRoot
-
-# cd C:\; .\menu_v2.ps1
-
-# Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy RemoteSigned -Force
-
-# Línea divisoria
-    Write-Host "------------------------------------------------------------" -ForegroundColor DarkGray
 
 # ---------------------------------------
 
@@ -1609,96 +1592,98 @@ $commands = @(
 }
 
 # ---------------------------------------
-
-# ---------------------------------------
-# --------------------------------------- 
-
+# OK - claude
 @{
-    Name = "150 - Descargar y descomprimir Snappy Driver Installer 7z"
+    Name = "130 - Descargar y descomprimir Snappy Driver Installer 7z"
     Action = {
-        if (-not $script:Task11Started) {
-            Clear-Messages
-            Update-Messages "Iniciando descarga y configuración de Snappy Driver Installer (7z)..." -ForegroundColor Yellow
-            $script:Task11Started = $true
-        }
+        Clear-Messages
+        Update-Messages "Iniciando descarga de Snappy Driver Installer..."
 
-        # Variables
         $url         = "https://driveroff.net/drv/SDI_1.25.3.7z"
         $output7z    = "C:\SDI_1.25.3.7z"
         $extractPath = "C:\SDI_1.25.3"
+        $sevenZip    = "$env:ProgramFiles\7-Zip\7z.exe"
 
-        ### PASO 1: Descargar el archivo ###
+        # Verificar 7-Zip
+        if (-not (Test-Path $sevenZip)) {
+            Update-Messages "❌ 7-Zip no encontrado. Instálalo primero con la opción 121 o 122."
+            return
+        }
+
+        # PASO 1: Descargar
         if (-not (Test-Path $output7z)) {
-            Write-Host "`n--- Descargando SDI (modo binario) ---" -ForegroundColor Yellow
-            Invoke-WebRequest -Uri $url -OutFile $output7z -UseBasicParsing
+            Update-Messages "⏳ Descargando SDI desde $url ..."
+            try {
+                Invoke-WebRequest -Uri $url -OutFile $output7z -UseBasicParsing -ErrorAction Stop
+                Update-Messages "✅ Descarga completada."
+            } catch {
+                Update-Messages "❌ Error al descargar: $($_.Exception.Message)"
+                return
+            }
         } else {
-            Update-Messages "? Archivo ya existe, omitiendo descarga."
+            Update-Messages "✅ Archivo ya existe, omitiendo descarga."
         }
 
         # Validar archivo
-        if (-not (Test-Path $output7z)) {
-            throw "? No se encontró el archivo descargado."
-        }
         $size = (Get-Item $output7z).Length
         if ($size -lt 1024) {
-            throw "? El archivo descargado es demasiado pequeño (${size} bytes), probablemente está corrupto."
+            Update-Messages "❌ El archivo descargado parece corrupto (${size} bytes)."
+            Remove-Item $output7z -Force -ErrorAction SilentlyContinue
+            return
         }
+        Update-Messages "   Tamaño: $([math]::Round($size/1MB, 2)) MB"
 
-        ### PASO 2: Preparar carpeta de extracción ###
+        # PASO 2: Preparar carpeta
         if (Test-Path $extractPath) {
-            Remove-Item -Path $extractPath -Recurse -Force -ErrorAction Stop
+            Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
         }
         New-Item -ItemType Directory -Path $extractPath -Force | Out-Null
-        Update-Messages "? Carpeta destino lista: $extractPath"
+        Update-Messages "✅ Carpeta destino lista: $extractPath"
 
-        ### PASO 3: Descomprimir 7z ###
+        # PASO 3: Descomprimir
+        Update-Messages "⏳ Descomprimiendo..."
         try {
-            $sevenZip = "C:\Program Files\7-Zip\7z.exe"
-if (Test-Path $sevenZip) {
-    Write-Host "`n--- Descomprimiendo $output7z en $extractPath ---" -ForegroundColor Yellow
-    Start-Process -FilePath $sevenZip `
-        -ArgumentList "x `"$output7z`" -o`"$extractPath`" -y" `
-        -Wait -NoNewWindow
-}else {
-                throw "? 7-Zip no encontrado en C:\Program Files\7-Zip\7z.exe. Instálalo primero."
-            }
+            Start-Process -FilePath $sevenZip `
+                -ArgumentList "x `"$output7z`" -o`"$extractPath`" -y" `
+                -Wait -NoNewWindow -ErrorAction Stop
 
             $archivos = Get-ChildItem -Path $extractPath -Recurse -ErrorAction Stop
             if ($archivos.Count -eq 0) {
-                throw "? La carpeta de destino está vacía. Descompresión fallida."
+                Update-Messages "❌ La carpeta de destino está vacía. Descompresión fallida."
+                return
             }
+            Update-Messages "✅ Descompresión completada. $($archivos.Count) archivos extraídos."
         } catch {
-            throw "? Error al descomprimir el archivo: $_"
+            Update-Messages "❌ Error al descomprimir: $($_.Exception.Message)"
+            return
         }
 
-        ### PASO 4: Mover el archivo 7z dentro de la carpeta descomprimida ###
+        # PASO 4: Mover el 7z dentro de la carpeta
         try {
             $dest7z = Join-Path $extractPath (Split-Path $output7z -Leaf)
             Move-Item -Path $output7z -Destination $dest7z -Force -ErrorAction Stop
-            Update-Messages "? 7z movido dentro de la carpeta descomprimida: $dest7z"
+            Update-Messages "✅ Archivo 7z movido a: $dest7z"
         } catch {
-            Update-Messages "?? Fallo al mover el 7z a la carpeta destino." -ForegroundColor Red
+            Update-Messages "⚠️ No se pudo mover el archivo 7z: $($_.Exception.Message)"
         }
 
-        ### FINAL: Confirmación ###
-        Update-Messages "? Snappy Driver Installer listo en $extractPath" -ForegroundColor Green
+        Update-Messages "-----------------------------------------"
+        Update-Messages "✅ Snappy Driver Installer listo en $extractPath"
+        Update-Messages "-----------------------------------------"
         Start-Sleep -Seconds 2
-        $script:ExecutedOptions['113'] = $true
+        $script:ExecutedOptions['130'] = $true
         Clear-Messages
     }
     Executed = $false
 }
 
-# --------------------------------------- 
-# --------------------------------------- 
 # ---------------------------------------
-# ---------------------------------------
-# OK
+# OK - claude
 @{
-    Name = "210 - Mantenimiento completo del sistema DISM y SFC"
+    Name = "131 - Mantenimiento completo del sistema DISM y SFC"
     Action = {
         Clear-Messages
-        Update-Messages "Iniciando mantenimiento completo del sistema..." -ForegroundColor Cyan
+        Update-Messages "Iniciando mantenimiento completo del sistema..."
 
         function Test-Admin {
             return ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).
@@ -1709,13 +1694,13 @@ if (Test-Path $sevenZip) {
             param([int]$Percent, [string]$Activity)
             $barLength    = 30
             $filledLength = [int]($barLength * $Percent / 100)
-            $bar          = "¦" * $filledLength + "¦" * ($barLength - $filledLength)
+            $bar          = "█" * $filledLength + "░" * ($barLength - $filledLength)
             Update-Messages "[${bar}] ${Percent}% - ${Activity}"
         }
 
         # --- 1) Verificar administrador ---
         if (-not (Test-Admin)) {
-            Update-Messages "? ERROR: Ejecuta el script como Administrador."
+            Update-Messages "❌ ERROR: Ejecuta el script como Administrador."
             return
         }
 
@@ -1728,17 +1713,17 @@ if (Test-Path $sevenZip) {
             switch ($disk.MediaType) {
                 'SSD' {
                     $isSSD = $true
-                    Update-Messages "? Unidad C: es SSD. Se omitirá desfragmentación."
+                    Update-Messages "✅ Unidad C: es SSD. Se omitirá desfragmentación."
                 }
                 'HDD' {
-                    Update-Messages "? Unidad C: es HDD. Desfragmentación permitida."
+                    Update-Messages "✅ Unidad C: es HDD. Desfragmentación permitida."
                 }
                 default {
-                    Update-Messages "?? Tipo de medio desconocido ($tipoDs). Se omitirá desfragmentación por seguridad."
+                    Update-Messages "⚠️ Tipo de medio desconocido ($tipoDs). Se omitirá desfragmentación por seguridad."
                 }
             }
         } catch {
-            Update-Messages "?? Error detectando tipo de disco: $($_.Exception.Message). Se omitirá desfragmentación."
+            Update-Messages "⚠️ Error detectando tipo de disco: $($_.Exception.Message). Se omitirá desfragmentación."
         }
 
         # --- 3) Definir tareas DISM + SFC en orden con dependencias ---
@@ -1748,88 +1733,88 @@ if (Test-Path $sevenZip) {
         # DISM CheckHealth
         Show-TextBar -Percent 10 -Activity "DISM /CheckHealth"
         Update-Messages "-----------------------------------------"
-        Update-Messages "? Ejecutando DISM /CheckHealth..."
+        Update-Messages "⏳ Ejecutando DISM /CheckHealth..."
         try {
             $output = DISM.exe /Online /Cleanup-Image /CheckHealth 2>&1
             $output | ForEach-Object { Update-Messages "   $_" }
             if ($LASTEXITCODE -ne 0) {
-                Update-Messages "?? CheckHealth detectó problemas (código $LASTEXITCODE). Continuando con ScanHealth..."
+                Update-Messages "⚠️ CheckHealth detectó problemas (código $LASTEXITCODE). Continuando con ScanHealth..."
             } else {
-                Update-Messages "? DISM /CheckHealth completado sin errores."
+                Update-Messages "✅ DISM /CheckHealth completado sin errores."
             }
         } catch {
-            Update-Messages "? Error en DISM /CheckHealth: $($_.Exception.Message)"
+            Update-Messages "❌ Error en DISM /CheckHealth: $($_.Exception.Message)"
             $errores += "DISM /CheckHealth"
         }
 
         # DISM ScanHealth
         Show-TextBar -Percent 25 -Activity "DISM /ScanHealth"
         Update-Messages "-----------------------------------------"
-        Update-Messages "? Ejecutando DISM /ScanHealth (puede tardar varios minutos)..."
+        Update-Messages "⏳ Ejecutando DISM /ScanHealth (puede tardar varios minutos)..."
         try {
             $output = DISM.exe /Online /Cleanup-Image /ScanHealth 2>&1
             $output | ForEach-Object { Update-Messages "   $_" }
             if ($LASTEXITCODE -ne 0) {
-                Update-Messages "?? ScanHealth detectó componentes dañados (código $LASTEXITCODE). Ejecutando RestoreHealth..."
+                Update-Messages "⚠️ ScanHealth detectó componentes dañados (código $LASTEXITCODE). Ejecutando RestoreHealth..."
             } else {
-                Update-Messages "? DISM /ScanHealth completado. No se detectaron daños."
+                Update-Messages "✅ DISM /ScanHealth completado. No se detectaron daños."
                 $saltarRestoreHealth = $false
             }
         } catch {
-            Update-Messages "? Error en DISM /ScanHealth: $($_.Exception.Message)"
+            Update-Messages "❌ Error en DISM /ScanHealth: $($_.Exception.Message)"
             $errores += "DISM /ScanHealth"
         }
 
         # DISM RestoreHealth (siempre se ejecuta, ScanHealth puede no detectar todo)
         Show-TextBar -Percent 45 -Activity "DISM /RestoreHealth"
         Update-Messages "-----------------------------------------"
-        Update-Messages "? Ejecutando DISM /RestoreHealth (puede tardar bastante)..."
+        Update-Messages "⏳ Ejecutando DISM /RestoreHealth (puede tardar bastante)..."
         try {
             $output = DISM.exe /Online /Cleanup-Image /RestoreHealth 2>&1
             $output | ForEach-Object { Update-Messages "   $_" }
             if ($LASTEXITCODE -ne 0) {
-                Update-Messages "? RestoreHealth falló (código $LASTEXITCODE)."
+                Update-Messages "❌ RestoreHealth falló (código $LASTEXITCODE)."
                 $errores += "DISM /RestoreHealth"
             } else {
-                Update-Messages "? DISM /RestoreHealth completado correctamente."
+                Update-Messages "✅ DISM /RestoreHealth completado correctamente."
             }
         } catch {
-            Update-Messages "? Error en DISM /RestoreHealth: $($_.Exception.Message)"
+            Update-Messages "❌ Error en DISM /RestoreHealth: $($_.Exception.Message)"
             $errores += "DISM /RestoreHealth"
         }
 
         # DISM StartComponentCleanup
         Show-TextBar -Percent 60 -Activity "DISM /StartComponentCleanup"
         Update-Messages "-----------------------------------------"
-        Update-Messages "? Ejecutando DISM /StartComponentCleanup..."
+        Update-Messages "⏳ Ejecutando DISM /StartComponentCleanup..."
         try {
             $output = DISM.exe /Online /Cleanup-Image /StartComponentCleanup 2>&1
             $output | ForEach-Object { Update-Messages "   $_" }
             if ($LASTEXITCODE -ne 0) {
-                Update-Messages "?? StartComponentCleanup finalizó con código $LASTEXITCODE."
+                Update-Messages "⚠️ StartComponentCleanup finalizó con código $LASTEXITCODE."
             } else {
-                Update-Messages "? DISM /StartComponentCleanup completado."
+                Update-Messages "✅ DISM /StartComponentCleanup completado."
             }
         } catch {
-            Update-Messages "? Error en DISM /StartComponentCleanup: $($_.Exception.Message)"
+            Update-Messages "❌ Error en DISM /StartComponentCleanup: $($_.Exception.Message)"
             $errores += "DISM /StartComponentCleanup"
         }
 
         # SFC /scannow
         Show-TextBar -Percent 75 -Activity "SFC /scannow"
         Update-Messages "-----------------------------------------"
-        Update-Messages "? Ejecutando SFC /scannow (puede tardar varios minutos)..."
+        Update-Messages "⏳ Ejecutando SFC /scannow (puede tardar varios minutos)..."
         try {
             $output = sfc.exe /scannow 2>&1
             $output | ForEach-Object { Update-Messages "   $_" }
             if ($LASTEXITCODE -ne 0) {
-                Update-Messages "?? SFC detectó o no pudo reparar algunos archivos (código $LASTEXITCODE)."
+                Update-Messages "⚠️ SFC detectó o no pudo reparar algunos archivos (código $LASTEXITCODE)."
                 $errores += "SFC /scannow"
             } else {
-                Update-Messages "? SFC /scannow completado. No se encontraron archivos dañados."
+                Update-Messages "✅ SFC /scannow completado. No se encontraron archivos dañados."
             }
         } catch {
-            Update-Messages "? Error en SFC /scannow: $($_.Exception.Message)"
+            Update-Messages "❌ Error en SFC /scannow: $($_.Exception.Message)"
             $errores += "SFC /scannow"
         }
 
@@ -1837,31 +1822,31 @@ if (Test-Path $sevenZip) {
         if (-not $isSSD -and $tipoDs -ne "Desconocido") {
             Show-TextBar -Percent 90 -Activity "Desfragmentando disco C:"
             Update-Messages "-----------------------------------------"
-            Update-Messages "? Ejecutando desfragmentación de C:..."
+            Update-Messages "⏳ Ejecutando desfragmentación de C:..."
             try {
                 $output = defrag.exe C: /U /V 2>&1
                 $output | ForEach-Object { Update-Messages "   $_" }
-                Update-Messages "? Desfragmentación completada."
+                Update-Messages "✅ Desfragmentación completada."
             } catch {
-                Update-Messages "? Error en desfragmentación: $($_.Exception.Message)"
+                Update-Messages "❌ Error en desfragmentación: $($_.Exception.Message)"
                 $errores += "Desfragmentación"
             }
         } else {
             Show-TextBar -Percent 90 -Activity "Ejecutando TRIM en SSD..."
             Update-Messages "-----------------------------------------"
-            Update-Messages "? Ejecutando TRIM en SSD C:..."
+            Update-Messages "⏳ Ejecutando TRIM en SSD C:..."
             try {
                 Optimize-Volume -DriveLetter C -ReTrim -Verbose -ErrorAction Stop | Out-Null
-                Update-Messages "? TRIM ejecutado correctamente."
+                Update-Messages "✅ TRIM ejecutado correctamente."
             } catch {
-                Update-Messages "?? No se pudo ejecutar TRIM: $($_.Exception.Message)"
+                Update-Messages "⚠️ No se pudo ejecutar TRIM: $($_.Exception.Message)"
             }
         }
 
         # --- 4) Resumen final ---
         Show-TextBar -Percent 100 -Activity "Mantenimiento completado."
         Update-Messages "-----------------------------------------"
-        Update-Messages "?? Resumen del mantenimiento:"
+        Update-Messages "📋 Resumen del mantenimiento:"
         $tareas = @(
             "DISM /CheckHealth",
             "DISM /ScanHealth", 
@@ -1871,21 +1856,21 @@ if (Test-Path $sevenZip) {
         )
         foreach ($tarea in $tareas) {
             if ($errores -contains $tarea) {
-                Update-Messages "   ? $tarea"
+                Update-Messages "   ❌ $tarea"
             } else {
-                Update-Messages "   ? $tarea"
+                Update-Messages "   ✅ $tarea"
             }
         }
         Update-Messages "-----------------------------------------"
 
         if ($errores.Count -eq 0) {
-            Update-Messages "? Mantenimiento completado sin errores." -ForegroundColor Cyan
+            Update-Messages "✅ Mantenimiento completado sin errores."
         } else {
-            Update-Messages "?? Completado con $($errores.Count) error(es). Revisa los pasos marcados." -ForegroundColor Yellow
-            Update-Messages "   ?? Si SFC falló tras RestoreHealth, prueba a reiniciar y ejecutar de nuevo."
+            Update-Messages "⚠️ Completado con $($errores.Count) error(es). Revisa los pasos marcados."
+            Update-Messages "   💡 Si SFC falló tras RestoreHealth, prueba a reiniciar y ejecutar de nuevo."
         }
 
-        $script:ExecutedOptions['210'] = $true
+        $script:ExecutedOptions['131'] = $true
         Start-Sleep -Seconds 2
         Clear-Messages
     }
@@ -1895,13 +1880,11 @@ if (Test-Path $sevenZip) {
 # --------------------------------------- 
 # OK
 # Coloca esto al principio de tu script, solo una vez:
-$script:ExecutedOptions['22'] = $false
-
 @{
-    Name = "212 - Limpieza avanzada de disco, archivos temporales y puntos de restauración (mejorado)"
+    Name = "132 - Limpieza avanzada de disco, archivos temporales y puntos de restauración (mejorado)"
     Action = {
         Clear-Messages
-        Update-Messages "Iniciando limpieza avanzada del sistema..." -ForegroundColor Cyan
+        Update-Messages "Iniciando limpieza avanzada del sistema..."
 
         function Test-Admin {
             return ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).
@@ -1912,7 +1895,7 @@ $script:ExecutedOptions['22'] = $false
             param([int]$Percent, [string]$Activity)
             $barLength    = 30
             $filledLength = [int]($barLength * $Percent / 100)
-            $bar          = "¦" * $filledLength + "¦" * ($barLength - $filledLength)
+            $bar          = "█" * $filledLength + "░" * ($barLength - $filledLength)
             Update-Messages "[${bar}] ${Percent}% - ${Activity}"
         }
 
@@ -1939,25 +1922,25 @@ $script:ExecutedOptions['22'] = $false
                 if ($before -ne $null -and $after -ne $null) {
                     $delta = [math]::Round(($after - $before), 2)
                     if ($delta -lt 0) { $delta = 0 }
-                    Update-Messages "   ? $Desc (Liberado: ${delta} GB)"
+                    Update-Messages "   ✅ $Desc (Liberado: ${delta} GB)"
                 } else {
-                    Update-Messages "   ? $Desc"
+                    Update-Messages "   ✅ $Desc"
                 }
             } catch {
-                Update-Messages "   ? Error en '$Desc': $($_.Exception.Message)"
+                Update-Messages "   ❌ Error en '$Desc': $($_.Exception.Message)"
             }
         }
 
         # --- Verificar administrador ---
         if (-not (Test-Admin)) {
-            Update-Messages "? ERROR: Ejecuta el script como Administrador."
+            Update-Messages "❌ ERROR: Ejecuta el script como Administrador."
             return
         }
 
         # --- Espacio inicial ---
         $globalBefore = Get-FreeSpaceGB
         Update-Messages "-----------------------------------------"
-        Update-Messages "?? Espacio libre inicial en C: ${globalBefore} GB"
+        Update-Messages "📋 Espacio libre inicial en C: ${globalBefore} GB"
         Update-Messages "-----------------------------------------"
 
         # --- 1) Temporales de usuarios ---
@@ -2125,15 +2108,15 @@ $script:ExecutedOptions['22'] = $false
                 foreach ($point in $toDelete) {
                     $ts = [System.Management.ManagementDateTimeConverter]::ToDateTime($point.CreationTime)
                     vssadmin delete shadows /Shadow={$point.ShadowID} /Quiet 2>&1 | Out-Null
-                    Update-Messages "   ??? Eliminado: [$($point.SequenceNumber)] $($ts.ToString('yyyy-MM-dd HH:mm:ss')) - $($point.Description)"
+                    Update-Messages "   🗑️ Eliminado: [$($point.SequenceNumber)] $($ts.ToString('yyyy-MM-dd HH:mm:ss')) - $($point.Description)"
                 }
                 $last = $sorted[-1]
                 $tsL  = [System.Management.ManagementDateTimeConverter]::ToDateTime($last.CreationTime)
-                Update-Messages "   ? Conservado: [$($last.SequenceNumber)] $($tsL.ToString('yyyy-MM-dd HH:mm:ss')) - $($last.Description)"
+                Update-Messages "   ✅ Conservado: [$($last.SequenceNumber)] $($tsL.ToString('yyyy-MM-dd HH:mm:ss')) - $($last.Description)"
             } elseif ($allPoints -and $allPoints.Count -eq 1) {
-                Update-Messages "   ?? Solo hay un punto de restauración, no se elimina nada."
+                Update-Messages "   ℹ️ Solo hay un punto de restauración, no se elimina nada."
             } else {
-                Update-Messages "   ?? No hay puntos de restauración para eliminar."
+                Update-Messages "   ℹ️ No hay puntos de restauración para eliminar."
             }
         }
 
@@ -2149,15 +2132,15 @@ $script:ExecutedOptions['22'] = $false
         Update-Messages "-----------------------------------------"
         if ($globalBefore -ne $null -and $globalAfter -ne $null) {
             $totalLiberado = [math]::Round(($globalAfter - $globalBefore), 2)
-            Update-Messages "?? Espacio libre inicial : ${globalBefore} GB"
-            Update-Messages "?? Espacio libre final   : ${globalAfter} GB"
-            Update-Messages "? Espacio total liberado : ${totalLiberado} GB"
+            Update-Messages "📋 Espacio libre inicial : ${globalBefore} GB"
+            Update-Messages "📋 Espacio libre final   : ${globalAfter} GB"
+            Update-Messages "✅ Espacio total liberado : ${totalLiberado} GB"
         } else {
-            Update-Messages "? Limpieza avanzada completada."
+            Update-Messages "✅ Limpieza avanzada completada."
         }
         Update-Messages "-----------------------------------------"
 
-        $script:ExecutedOptions['212'] = $true
+        $script:ExecutedOptions['132'] = $true
         Start-Sleep -Seconds 2
         Clear-Messages
     }
@@ -2167,10 +2150,10 @@ $script:ExecutedOptions['22'] = $false
 # --------------------------------------- 
 
 @{
-    Name = "220 - Activar Windows";
+    Name = "150 - Activar Windows";
     Action = {
         Clear-Messages
-        Update-Messages "Activación de Windows..." -ForegroundColor Cyan
+        Update-Messages "Iniciando activación de Windows..."
         
         # Mostrar opciones al usuario en una sola línea
         $optionsMessage = @"
@@ -2180,7 +2163,7 @@ Seleccione la versión de Windows para activar:
 03 - Windows LTSC
 04 - Salir al menú principal
 "@
-        Update-Messages $optionsMessage -ForegroundColor Yellow
+        Update-Messages $optionsMessage
         
         # Solicitar al usuario que seleccione una opción
         $choice = Read-Host "Ingrese el número de la opción (01, 02, 03 o 04)"
@@ -2188,51 +2171,51 @@ Seleccione la versión de Windows para activar:
         # Realizar la activación o salir según la opción seleccionada
         switch ($choice) {
             "01" {
-                Update-Messages "Activando Windows 10..." -ForegroundColor Yellow
+                Update-Messages "⏳ Activando Windows 10..."
                 try {
                     slmgr /ipk W269N-WFGWX-YVC9B-4J6C9-T83GX
                     slmgr /skms kms.digiboy.ir
                     slmgr /ato
-                    Update-Messages "Windows 10 activado correctamente." -ForegroundColor Green
+                    Update-Messages "✅ Windows 10 activado correctamente."
                 } catch {
-                    Update-Messages "Error al activar Windows 10: $($_.Exception.Message)" -ForegroundColor Red
+                    Update-Messages "❌ Error al activar Windows 10: $($_.Exception.Message)"
                 }
             }
             "02" {
-                Update-Messages "Activando Windows 11..." -ForegroundColor Yellow
+                Update-Messages "⏳ Activando Windows 11..."
                 try {
                     slmgr /ipk W269N-WFGWX-YVC9B-4J6C9-T83GX
                     slmgr /skms kms.digiboy.ir
                     slmgr /ato
-                    Update-Messages "Windows 11 activado correctamente." -ForegroundColor Green
+                    Update-Messages "✅ Windows 11 activado correctamente."
                 } catch {
-                    Update-Messages "Error al activar Windows 11: $($_.Exception.Message)" -ForegroundColor Red
+                    Update-Messages "❌ Error al activar Windows 11: $($_.Exception.Message)"
                 }
             }
             "03" {
-                Update-Messages "Activando Windows LTSC..." -ForegroundColor Yellow
+                Update-Messages "⏳ Activando Windows LTSC..."
                 try {
                     slmgr /ipk M7XTQ-FN8P6-TTKYV-9D4CC-J462D
                     slmgr /skms kms.digiboy.ir
                     slmgr /ato
-                    Update-Messages "Windows LTSC activado correctamente." -ForegroundColor Green
+                    Update-Messages "✅ Windows LTSC activado correctamente."
                 } catch {
-                    Update-Messages "Error al activar Windows LTSC: $($_.Exception.Message)" -ForegroundColor Red
+                    Update-Messages "❌ Error al activar Windows LTSC: $($_.Exception.Message)"
                 }
             }
             "04" {
-                Update-Messages "Saliendo al menú principal..." -ForegroundColor Cyan
+                Update-Messages "Saliendo al menú principal..."
                 Start-Sleep -Seconds 2
                 Clear-Messages
                 return
             }
             default {
-                Update-Messages "Opción no válida. Por favor, seleccione una opción válida." -ForegroundColor Red
+                Update-Messages "❌ Opción no válida. Por favor, seleccione una opción válida."
             }
         }
         
         # Mensaje final y regresar al menú principal
-        Update-Messages "Proceso de activación completado. Volviendo al menú principal..." -ForegroundColor Cyan
+        Update-Messages "✅ Proceso de activación completado."
         Start-Sleep -Seconds 2
         Clear-Messages
     };
@@ -2241,24 +2224,22 @@ Seleccione la versión de Windows para activar:
 
 # --------------------------------------- 
 
-# Coloca esto al principio de tu script, solo una vez:
-if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
-
+# OK - claude
 @{
     Name = "260 - Reiniciar la cola de impresión";
     Action = {
         Clear-Messages
-        Update-Messages "Iniciando el reinicio de la cola de impresión..." -ForegroundColor Cyan
+        Update-Messages "Iniciando el reinicio de la cola de impresión..."
 
         # Helper genérico para pasos con mensajes y errores
         function Exec {
             param([string]$Desc, [scriptblock]$Code)
-            Update-Messages "$Desc..." -ForegroundColor Yellow
+            Update-Messages "⏳ $Desc..."
             try {
                 & $Code
-                Update-Messages "? $Desc completado." -ForegroundColor Green
+                Update-Messages "✅ $Desc completado."
             } catch {
-                Update-Messages "? Error en '$Desc': $($_.Exception.Message)" -ForegroundColor Red
+                Update-Messages "❌ Error en '$Desc': $($_.Exception.Message)"
             }
         }
 
@@ -2285,7 +2266,7 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
             Start-Service -Name Spooler -ErrorAction Stop
         }
 
-        Update-Messages "Reinicio de la cola de impresión finalizado." -ForegroundColor Cyan
+        Update-Messages "✅ Cola de impresión reiniciada correctamente."
         Clear-Messages
         $script:ExecutedOptions['26'] = $true
     };
@@ -2294,14 +2275,12 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
 
 # --------------------------------------- 
 
-# Coloca esto al principio de tu script, solo una vez:
-if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
-
+# OK - claude
 @{
     Name = "270 - Verificar la memoria RAM"
     Action = {
         Clear-Messages
-        Update-Messages "Iniciando programación de diagnóstico de memoria RAM..." -ForegroundColor Cyan
+        Update-Messages "Iniciando diagnóstico de memoria RAM..."
 
         function Test-Admin {
             return ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).
@@ -2310,18 +2289,18 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
 
         function Exec {
             param([string]$Desc, [scriptblock]$Code)
-            Update-Messages "$Desc..." -ForegroundColor Yellow
+            Update-Messages "⏳ $Desc..."
             try {
                 & $Code
-                Update-Messages "? $Desc completado." -ForegroundColor Green
+                Update-Messages "✅ $Desc completado."
             } catch {
-                Update-Messages "? Error en '$Desc': $($_.Exception.Message)" -ForegroundColor Red
+                Update-Messages "❌ Error en '$Desc': $($_.Exception.Message)"
             }
         }
 
         # --- 1) Verificar administrador ---
         if (-not (Test-Admin)) {
-            Update-Messages "? ERROR: Ejecuta el script como Administrador."
+            Update-Messages "❌ ERROR: Ejecuta el script como Administrador."
             return
         }
 
@@ -2330,14 +2309,14 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
             $ram     = Get-CimInstance -ClassName Win32_PhysicalMemory
             $totalGB = [math]::Round(($ram | Measure-Object -Property Capacity -Sum).Sum / 1GB, 2)
             Update-Messages "-----------------------------------------"
-            Update-Messages "?? RAM instalada actualmente:"
+            Update-Messages "📋 RAM instalada actualmente:"
             Update-Messages "   Total: $totalGB GB"
             $ram | ForEach-Object {
                 Update-Messages "   Banco: $($_.BankLabel) | $([math]::Round($_.Capacity/1GB,0)) GB | $($_.Speed) MHz | $($_.Manufacturer)"
             }
             Update-Messages "-----------------------------------------"
         } catch {
-            Update-Messages "?? No se pudo obtener información de RAM: $($_.Exception.Message)"
+            Update-Messages "⚠️ No se pudo obtener información de RAM: $($_.Exception.Message)"
         }
 
         # --- 3) Mostrar resultados del último diagnóstico si existen ---
@@ -2348,15 +2327,15 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
 
             if ($eventos) {
                 Update-Messages "-----------------------------------------"
-                Update-Messages "?? Último diagnóstico de RAM ejecutado:"
+                Update-Messages "📋 Último diagnóstico de RAM ejecutado:"
                 Update-Messages "   Fecha  : $($eventos.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss'))"
                 Update-Messages "   Resultado: $($eventos.Message)"
                 Update-Messages "-----------------------------------------"
             } else {
-                Update-Messages "??  No se encontraron diagnósticos previos de RAM."
+                Update-Messages "ℹ️ No se encontraron diagnósticos previos de RAM."
             }
         } catch {
-            Update-Messages "??  No se encontraron diagnósticos previos de RAM."
+            Update-Messages "ℹ️ No se encontraron diagnósticos previos de RAM."
         }
 
         # --- 4) Programar diagnóstico via BCDEdit ---
@@ -2375,45 +2354,45 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
             Exec "Verificar configuración de arranque" {
                 $seq = bcdedit /enum "{current}" 2>&1 | Select-String "bootsequence"
                 if ($seq -and $seq -match "{memdiag}") {
-                    Update-Messages "   ? {memdiag} confirmado en bootsequence."
+                    Update-Messages "   ✅ {memdiag} confirmado en bootsequence."
                 } else {
                     throw "No se encontró {memdiag} en bootsequence."
                 }
             }
         } else {
             # Fallback SOLO si BCDEdit falló
-            Update-Messages "?? BCDEdit falló, usando registro como alternativa..." -ForegroundColor Yellow
+            Update-Messages "⚠️ BCDEdit falló, usando registro como alternativa..."
             try {
                 $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager"
                 $current = (Get-ItemProperty -Path $regPath -Name BootExecute).BootExecute
                 if ($current -notcontains "memdiag") {
                     Set-ItemProperty -Path $regPath -Name BootExecute `
                         -Value ($current + "memdiag") -Force
-                    Update-Messages "? Diagnóstico programado via registro."
+                    Update-Messages "✅ Diagnóstico programado via registro."
                 } else {
-                    Update-Messages "? Diagnóstico ya estaba programado via registro."
+                    Update-Messages "✅ Diagnóstico ya estaba programado via registro."
                 }
             } catch {
-                Update-Messages "? Error en fallback: $($_.Exception.Message)"
+                Update-Messages "❌ Error en fallback: $($_.Exception.Message)"
             }
         }
 
         # --- 6) Preguntar si reiniciar ahora ---
         Update-Messages "-----------------------------------------"
-        Update-Messages "??  El diagnóstico requiere reinicio para ejecutarse."
+        Update-Messages "⚠️  El diagnóstico requiere reinicio para ejecutarse."
         Update-Messages "-----------------------------------------"
         $respuesta = Read-Host "¿Deseas reiniciar ahora para ejecutar la prueba? (S/N)"
 
         if ($respuesta -eq "S" -or $respuesta -eq "s") {
-            Update-Messages "?? Reiniciando el equipo en 10 segundos..."
+            Update-Messages "⏳ Reiniciando el equipo en 10 segundos..."
             Update-Messages "   Cierra cualquier aplicación abierta."
             Start-Sleep -Seconds 10
             Restart-Computer -Force -Confirm:$false
         } else {
             Update-Messages "-----------------------------------------"
-            Update-Messages "??  El diagnóstico se ejecutará en el próximo reinicio."
+            Update-Messages "ℹ️  El diagnóstico se ejecutará en el próximo reinicio."
             Update-Messages "   Los resultados estarán en el Visor de eventos:"
-            Update-Messages "   ? Registros de Windows ? Sistema ? MemoryDiagnostics-Results"
+            Update-Messages "   📁 Registros de Windows → Sistema → MemoryDiagnostics-Results"
             Update-Messages "-----------------------------------------"
         }
 
@@ -2424,20 +2403,13 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
     Executed = $false
 }
 
-# ---------------------------------------  
-
-
-
-# --------------------------------------- 
-
-
-# --------------------------------------- 
-
+# ---------------------------------------
+# OK - claude
 @{
     Name = "300 - Crear impresoras genéricas BARRA y COCINA";
     Action = {
         Clear-Messages
-        Update-Messages "Iniciando creación de impresoras genéricas..." -ForegroundColor Yellow
+        Update-Messages "Iniciando creación de impresoras genéricas..."
 
         try {
             # Datos para las impresoras
@@ -2451,30 +2423,30 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
             foreach ($printer in $printers) {
                 # Verificar si el puerto ya existe
                 if (-not (Get-PrinterPort -Name $printer.Port -ErrorAction SilentlyContinue)) {
-                    Update-Messages "Creando puerto: $($printer.Port)..." -ForegroundColor Cyan
+                    Update-Messages "⏳ Creando puerto: $($printer.Port)..."
                     Add-PrinterPort -Name $printer.Port
-                    Update-Messages "Puerto $($printer.Port) creado correctamente." -ForegroundColor Green
+                    Update-Messages "✅ Puerto $($printer.Port) creado correctamente."
                 } else {
-                    Update-Messages "El puerto $($printer.Port) ya existe. Continuando..." -ForegroundColor Yellow
+                    Update-Messages "✅ Puerto $($printer.Port) ya existe."
                 }
 
                 # Verificar si el controlador genérico está instalado
                 if (-not (Get-PrinterDriver -Name $driverName -ErrorAction SilentlyContinue)) {
-                    Update-Messages "Instalando controlador genérico: $driverName..." -ForegroundColor Cyan
+                    Update-Messages "⏳ Instalando controlador genérico: $driverName..."
                     Add-PrinterDriver -Name $driverName
-                    Update-Messages "Controlador genérico instalado correctamente." -ForegroundColor Green
+                    Update-Messages "✅ Controlador genérico instalado correctamente."
                 } else {
-                    Update-Messages "El controlador $driverName ya está instalado. Continuando..." -ForegroundColor Yellow
+                    Update-Messages "✅ Controlador $driverName ya está instalado."
                 }
 
                 # Crear la impresora
-                Update-Messages "Creando impresora $($printer.Name) en $($printer.Port)..." -ForegroundColor Cyan
+                Update-Messages "⏳ Creando impresora $($printer.Name) en $($printer.Port)..."
                 Add-Printer -Name $printer.Name -DriverName $driverName -PortName $printer.Port
-                Update-Messages "Impresora $($printer.Name) creada correctamente." -ForegroundColor Green
+                Update-Messages "✅ Impresora $($printer.Name) creada correctamente."
             }
 
         } catch {
-            Update-Messages "Error durante la creación de las impresoras: $($_.Exception.Message)" -ForegroundColor Red
+            Update-Messages "❌ Error durante la creación de las impresoras: $($_.Exception.Message)"
         }
 
         Clear-Messages
@@ -2483,22 +2455,18 @@ if (-not $script:ExecutedOptions) { $script:ExecutedOptions = @{ } }
     Executed = $false
 }
 
-# --------------------------------------- 
-
-
-
-# --------------------------------------- 
-# --------------------------------------- 
+# ---------------------------------------
+# OK - claude
 @{
-        Name = "990 - Salir";
-        Action = {
-            Clear-Messages
-            Update-Messages "Saliendo del menú..."
-            Start-Sleep -Seconds 1
-            exit
-        };
-        Executed = $false
+    Name = "990 - Salir"
+    Action = {
+        Clear-Messages
+        Update-Messages "Saliendo del menú..."
+        Start-Sleep -Seconds 1
+        exit
     }
+    Executed = $false
+}
 )
 
 # ---------------------------------------
@@ -2520,7 +2488,7 @@ function Show-Menu {
             Write-Host $command.Name -ForegroundColor Yellow
         }
 
-        # Separadores específicos
+                # Separadores específicos
         if ($command.Name -like "009*") {
             Write-Host "======================================" -ForegroundColor Blue
         }
@@ -2530,7 +2498,7 @@ function Show-Menu {
         if ($command.Name -like "122*") {
             Write-Host "======================================" -ForegroundColor Blue
         }
-        if ($command.Name -like "22*") {
+        if ($command.Name -like "132*") {
             Write-Host "======================================" -ForegroundColor Blue
         }
         if ($command.Name -like "26*") {
