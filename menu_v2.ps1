@@ -1410,75 +1410,54 @@ $commands = @(
 }
 
 # ---------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# OK Claude
+# ---------------------------------------
+# OK - claude
 @{
-    Name = "110 - Instalar software esencial (con Office 365)"
-    Action = {
+    Name     = "120 - Instalar Chocolatey"
+    Action   = {
+        $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+        if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            Update-Messages "❌ Error: Este script requiere ejecutarse como administrador."
+            Start-Sleep -Seconds 3
+            return
+        }
+
         Clear-Messages
-        Update-Messages "Iniciando instalación de software esencial (con Office 365)..." -ForegroundColor Cyan
+        Update-Messages "Iniciando tarea: Instalar Chocolatey..."
 
         $chocoPath = "$env:ProgramData\chocolatey\bin\choco.exe"
         if (-not (Test-Path $chocoPath)) {
-            Update-Messages "? ERROR: Chocolatey no está instalado. Ejecuta primero la opción 004." -ForegroundColor Red
+            Update-Messages "Chocolatey no detectado. Instalando..."
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+            try {
+                Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+                Start-Sleep -Seconds 2
+                Update-Messages "✅ Chocolatey instalado correctamente."
+            } catch {
+                Update-Messages "❌ Error instalando Chocolatey: $($_.Exception.Message)"
+            }
+        } else {
+            Update-Messages "✅ Chocolatey ya está instalado."
+        }
+
+        Clear-Messages
+    }
+    Executed = $false
+}
+
+# ---------------------------------------
+# ---------------------------------------
+# OK - claude
+@{
+    Name = "121 - Instalar software esencial (con Office 365)"
+    Action = {
+        Clear-Messages
+        Update-Messages "Iniciando instalación de software esencial (con Office 365)..."
+
+        $chocoPath = "$env:ProgramData\chocolatey\bin\choco.exe"
+        if (-not (Test-Path $chocoPath)) {
+            Update-Messages "❌ ERROR: Chocolatey no está instalado. Ejecuta primero la opción 120."
             return
         }
 
@@ -1486,35 +1465,23 @@ $commands = @(
             param([int]$Percent, [string]$Activity)
             $barLength    = 30
             $filledLength = [int]($barLength * $Percent / 100)
-            $bar          = "¦" * $filledLength + "¦" * ($barLength - $filledLength)
+            $bar          = "█" * $filledLength + "░" * ($barLength - $filledLength)
             Update-Messages "[${bar}] ${Percent}% - ${Activity}"
         }
 
         function Install-Choco {
-            param(
-                [string]$Nombre,
-                [string]$Paquete,
-                [string]$CheckPath = ""
-            )
+            param([string]$Nombre, [string]$Paquete, [string]$CheckPath = "")
             $instalado = $false
-            if ($CheckPath -and (Test-Path $CheckPath)) {
-                $instalado = $true
-            } elseif (-not $CheckPath) {
+            if ($CheckPath -and (Test-Path $CheckPath)) { $instalado = $true }
+            elseif (-not $CheckPath) {
                 $result = & "$chocoPath" list --local-only $Paquete 2>$null
                 if ($result -match $Paquete) { $instalado = $true }
             }
-
-            if ($instalado) {
-                Update-Messages "   ? $Nombre ya está instalado."
-                return
-            }
-
-            Update-Messages "   ?? Instalando $Nombre..."
+            if ($instalado) { Update-Messages "   ✅ $Nombre ya está instalado."; return }
+            Update-Messages "   ⏳ Instalando $Nombre..."
             & "$chocoPath" install $Paquete -y --no-progress 2>&1 | Out-Null
-
             if ($LASTEXITCODE -eq 0) {
-                Update-Messages "   ? $Nombre instalado correctamente."
-                # Eliminar solo el icono del programa recién instalado
+                Update-Messages "   ✅ $Nombre instalado correctamente."
                 foreach ($desk in @(
                     [Environment]::GetFolderPath("CommonDesktopDirectory"),
                     [Environment]::GetFolderPath("Desktop")
@@ -1524,7 +1491,7 @@ $commands = @(
                         Remove-Item -Force -ErrorAction SilentlyContinue
                 }
             } else {
-                Update-Messages "   ? Error instalando $Nombre."
+                Update-Messages "   ❌ Error instalando $Nombre."
             }
         }
 
@@ -1542,9 +1509,7 @@ $commands = @(
             @{ Nombre = "Office 365";              Paquete = "microsoft-office-deployment"; CheckPath = "" }
         )
 
-        $total   = $programas.Count
-        $current = 0
-
+        $total = $programas.Count; $current = 0
         foreach ($prog in $programas) {
             $current++
             $percent = [int](($current / $total) * 100)
@@ -1554,7 +1519,7 @@ $commands = @(
 
         Show-TextBar -Percent 100 -Activity "Instalación completada."
         Update-Messages "-----------------------------------------"
-        Update-Messages "? Software esencial (con Office 365) instalado correctamente."
+        Update-Messages "✅ Software esencial (con Office 365) instalado correctamente."
         Update-Messages "-----------------------------------------"
         Start-Sleep -Seconds 2
         Clear-Messages
@@ -1563,16 +1528,17 @@ $commands = @(
 }
 
 # ---------------------------------------
-
+# ---------------------------------------
+# OK - claude
 @{
-    Name = "111 - Instalar software esencial (con LibreOffice)"
+    Name = "122 - Instalar software esencial (con LibreOffice)"
     Action = {
         Clear-Messages
-        Update-Messages "Iniciando instalación de software esencial (con LibreOffice)..." -ForegroundColor Cyan
+        Update-Messages "Iniciando instalación de software esencial (con LibreOffice)..."
 
         $chocoPath = "$env:ProgramData\chocolatey\bin\choco.exe"
         if (-not (Test-Path $chocoPath)) {
-            Update-Messages "? ERROR: Chocolatey no está instalado. Ejecuta primero la opción 004." -ForegroundColor Red
+            Update-Messages "❌ ERROR: Chocolatey no está instalado. Ejecuta primero la opción 120."
             return
         }
 
@@ -1580,35 +1546,23 @@ $commands = @(
             param([int]$Percent, [string]$Activity)
             $barLength    = 30
             $filledLength = [int]($barLength * $Percent / 100)
-            $bar          = "¦" * $filledLength + "¦" * ($barLength - $filledLength)
+            $bar          = "█" * $filledLength + "░" * ($barLength - $filledLength)
             Update-Messages "[${bar}] ${Percent}% - ${Activity}"
         }
 
         function Install-Choco {
-            param(
-                [string]$Nombre,
-                [string]$Paquete,
-                [string]$CheckPath = ""
-            )
+            param([string]$Nombre, [string]$Paquete, [string]$CheckPath = "")
             $instalado = $false
-            if ($CheckPath -and (Test-Path $CheckPath)) {
-                $instalado = $true
-            } elseif (-not $CheckPath) {
+            if ($CheckPath -and (Test-Path $CheckPath)) { $instalado = $true }
+            elseif (-not $CheckPath) {
                 $result = & "$chocoPath" list --local-only $Paquete 2>$null
                 if ($result -match $Paquete) { $instalado = $true }
             }
-
-            if ($instalado) {
-                Update-Messages "   ? $Nombre ya está instalado."
-                return
-            }
-
-            Update-Messages "   ?? Instalando $Nombre..."
+            if ($instalado) { Update-Messages "   ✅ $Nombre ya está instalado."; return }
+            Update-Messages "   ⏳ Instalando $Nombre..."
             & "$chocoPath" install $Paquete -y --no-progress 2>&1 | Out-Null
-
             if ($LASTEXITCODE -eq 0) {
-                Update-Messages "   ? $Nombre instalado correctamente."
-                # Eliminar solo el icono del programa recién instalado
+                Update-Messages "   ✅ $Nombre instalado correctamente."
                 foreach ($desk in @(
                     [Environment]::GetFolderPath("CommonDesktopDirectory"),
                     [Environment]::GetFolderPath("Desktop")
@@ -1618,7 +1572,7 @@ $commands = @(
                         Remove-Item -Force -ErrorAction SilentlyContinue
                 }
             } else {
-                Update-Messages "   ? Error instalando $Nombre."
+                Update-Messages "   ❌ Error instalando $Nombre."
             }
         }
 
@@ -1636,9 +1590,7 @@ $commands = @(
             @{ Nombre = "Advanced IP Scanner";     Paquete = "advanced-ip-scanner"; CheckPath = "" }
         )
 
-        $total   = $programas.Count
-        $current = 0
-
+        $total = $programas.Count; $current = 0
         foreach ($prog in $programas) {
             $current++
             $percent = [int](($current / $total) * 100)
@@ -1648,7 +1600,7 @@ $commands = @(
 
         Show-TextBar -Percent 100 -Activity "Instalación completada."
         Update-Messages "-----------------------------------------"
-        Update-Messages "? Software esencial (con LibreOffice) instalado correctamente."
+        Update-Messages "✅ Software esencial (con LibreOffice) instalado correctamente."
         Update-Messages "-----------------------------------------"
         Start-Sleep -Seconds 2
         Clear-Messages
@@ -1658,128 +1610,7 @@ $commands = @(
 
 # ---------------------------------------
 
-@{
-    Name = "112 - Instalar entorno de desarrollo (Node.js, npm, pnpm, Git)"
-    Action = {
-        Clear-Messages
-        Update-Messages "Iniciando instalación de entorno de desarrollo..." -ForegroundColor Cyan
-
-        $chocoPath = "$env:ProgramData\chocolatey\bin\choco.exe"
-        if (-not (Test-Path $chocoPath)) {
-            Update-Messages "? ERROR: Chocolatey no está instalado. Ejecuta primero la opción 004." -ForegroundColor Red
-            return
-        }
-
-        function Show-TextBar {
-            param([int]$Percent, [string]$Activity)
-            $barLength    = 30
-            $filledLength = [int]($barLength * $Percent / 100)
-            $bar          = "¦" * $filledLength + "¦" * ($barLength - $filledLength)
-            Update-Messages "[${bar}] ${Percent}% - ${Activity}"
-        }
-
-        function Install-Choco {
-            param([string]$Nombre, [string]$Paquete, [string]$CheckPath = "")
-            $instalado = $false
-            if ($CheckPath -and (Test-Path $CheckPath)) {
-                $instalado = $true
-            } elseif (-not $CheckPath) {
-                $result = & "$chocoPath" list --local-only $Paquete 2>$null
-                if ($result -match $Paquete) { $instalado = $true }
-            }
-
-            if ($instalado) {
-                Update-Messages "   ? $Nombre ya está instalado."
-                return
-            }
-
-            Update-Messages "   ?? Instalando $Nombre..."
-            & "$chocoPath" install $Paquete -y --no-progress 2>&1 | Out-Null
-
-            if ($LASTEXITCODE -eq 0) {
-                Update-Messages "   ? $Nombre instalado correctamente."
-            } else {
-                Update-Messages "   ? Error instalando $Nombre."
-            }
-
-            # Limpiar iconos escritorio
-            foreach ($desk in @(
-                [Environment]::GetFolderPath("CommonDesktopDirectory"),
-                [Environment]::GetFolderPath("Desktop")
-            )) {
-                Get-ChildItem $desk -Filter "*.lnk" -ErrorAction SilentlyContinue |
-                    Where-Object { $_.Name -like "*$Nombre*" } |
-                    Remove-Item -Force -ErrorAction SilentlyContinue
-            }
-        }
-
-        # --- 1) Node.js ---
-        Show-TextBar -Percent 10 -Activity "Verificando Node.js..."
-        Install-Choco -Nombre "Node.js" -Paquete "nodejs-lts" `
-            -CheckPath "$env:ProgramFiles\nodejs\node.exe"
-
-        # Refrescar PATH para que npm esté disponible
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
-                    [System.Environment]::GetEnvironmentVariable("Path","User")
-
-        # --- 2) npm (actualizar a última versión) ---
-        Show-TextBar -Percent 35 -Activity "Actualizando npm a última versión..."
-        try {
-            $npmVersion = & npm --version 2>$null
-            if ($npmVersion) {
-                Update-Messages "   ?? npm detectado v$npmVersion, actualizando..."
-                & npm install -g npm 2>&1 | Out-Null
-                $npmVersionNew = & npm --version 2>$null
-                Update-Messages "   ? npm actualizado a v$npmVersionNew"
-            } else {
-                Update-Messages "   ? npm no detectado tras instalar Node.js."
-            }
-        } catch {
-            Update-Messages "   ? Error actualizando npm: $($_.Exception.Message)"
-        }
-
-        # --- 3) pnpm ---
-        Show-TextBar -Percent 60 -Activity "Verificando pnpm..."
-        try {
-            $pnpmVersion = & pnpm --version 2>$null
-            if ($pnpmVersion) {
-                Update-Messages "   ? pnpm ya está instalado v$pnpmVersion"
-            } else {
-                Update-Messages "   ?? Instalando pnpm..."
-                & npm install -g pnpm 2>&1 | Out-Null
-                $pnpmVersionNew = & pnpm --version 2>$null
-                Update-Messages "   ? pnpm instalado v$pnpmVersionNew"
-            }
-        } catch {
-            Update-Messages "   ? Error instalando pnpm: $($_.Exception.Message)"
-        }
-
-        # --- 4) Git ---
-        Show-TextBar -Percent 80 -Activity "Verificando Git..."
-        Install-Choco -Nombre "Git" -Paquete "git" `
-            -CheckPath "$env:ProgramFiles\Git\bin\git.exe"
-
-        # Refrescar PATH final
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
-                    [System.Environment]::GetEnvironmentVariable("Path","User")
-
-        # --- Resumen de versiones instaladas ---
-        Show-TextBar -Percent 100 -Activity "Instalación completada."
-        Update-Messages "-----------------------------------------"
-        Update-Messages "?? Versiones instaladas:"
-        try { Update-Messages "   Node.js : $(& node --version 2>$null)" } catch {}
-        try { Update-Messages "   npm     : v$(& npm --version 2>$null)" } catch {}
-        try { Update-Messages "   pnpm    : v$(& pnpm --version 2>$null)" } catch {}
-        try { Update-Messages "   Git     : $(& git --version 2>$null)" } catch {}
-        Update-Messages "-----------------------------------------"
-        Update-Messages "? Entorno de desarrollo instalado correctamente."
-        Update-Messages "-----------------------------------------"
-        Start-Sleep -Seconds 2
-        Clear-Messages
-    }
-    Executed = $false
-}
-
+# ---------------------------------------
 # --------------------------------------- 
 
 @{
@@ -1859,95 +1690,8 @@ if (Test-Path $sevenZip) {
 }
 
 # --------------------------------------- 
-
-@{
-    Name     = "114 - Instalar Ollama y descargar GLM-5:cloud"
-    Action   = {
-        Clear-Messages
-        Update-Messages "Iniciando instalación de Ollama y configuración de modelo..." -ForegroundColor Cyan
-
-        # 1. Verificar e Instalar Ollama
-        if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
-            Update-Messages "?? Ollama no detectado. Descargando instalador oficial..."
-            try {
-                # Ejecuta el script de instalación oficial de Ollama para Windows
-                irm https://ollama.com/install.ps1 | iex
-                Update-Messages "?? Instalación finalizada. Refrescando variables de entorno..."
-                
-                # Intentar refrescar el Path para la sesión actual
-                $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-            } catch {
-                Update-Messages "? Error al instalar Ollama: $($_.Exception.Message)"
-                return
-            }
-        } else {
-            Update-Messages "? Ollama ya está instalado."
-        }
-
-        # 2. Descargar y cargar el modelo glm-5:cloud
-        Update-Messages "?? Descargando el modelo 'glm-5:cloud' (esto puede tardar varios minutos)..."
-        
-        # Se usa 'pull' para descargarlo y dejarlo listo en el servidor
-        & ollama pull glm-5:cloud
-
-        if ($LASTEXITCODE -eq 0) {
-            Update-Messages "? Modelo 'glm-5:cloud' cargado correctamente en Ollama."
-        } else {
-            Update-Messages "? Error al descargar el modelo. Verifica tu conexión o el nombre del tag."
-        }
-
-        Start-Sleep -Seconds 3
-        Clear-Messages
-    }
-    Executed = $false
-}
-
 # --------------------------------------- 
-
-@{
-    Name     = "115 - Instalar Telegram Desktop (Chocolatey)"
-    Action   = {
-        Clear-Messages
-        Update-Messages "Iniciando instalación de Telegram Desktop..."
-        
-        if (Get-Command choco -ErrorAction SilentlyContinue) {
-            try {
-                Update-Messages "?? Ejecutando: choco install telegram -y"
-                choco install telegram -y
-                Update-Messages "? Telegram instalado correctamente."
-            } catch {
-                Update-Messages "? Error al instalar Telegram: $($_.Exception.Message)"
-            }
-        } else {
-            Update-Messages "? Error: Chocolatey no detectado. Instálalo primero con la opción 004."
-        }
-        
-        Start-Sleep -Seconds 3
-        Clear-Messages
-    }
-    Executed = $false
-}
-
 # ---------------------------------------
-
-@{
-    Name   = "116 - Lanzar OpenClaw (Ollama)"
-    Action = {
-        try {
-            Clear-Messages
-            Update-Messages "Lanzando OpenClaw con Ollama..."
-
-            ollama launch openclaw
-
-            Update-Messages "OpenClaw iniciado correctamente."
-        }
-        catch {
-            Update-Messages "Error al lanzar OpenClaw: $($_.Exception.Message)"
-        }
-    }
-    Executed = $false
-}
-
 # ---------------------------------------
 # OK
 @{
