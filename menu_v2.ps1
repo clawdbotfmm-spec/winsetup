@@ -1622,92 +1622,57 @@ $commands = @(
         # --- 2) Instalar 7-Zip si no está ---
         $sevenZip = "$env:ProgramFiles\7-Zip\7z.exe"
         if (-not (Test-Path $sevenZip)) {
-            Update-Messages "⏳ Instalando 7-Zip..."
-            try {
-                & "$chocoPath" install 7zip -y --no-progress 2>&1 | Out-Null
-                if ($LASTEXITCODE -eq 0) {
-                    Update-Messages "✅ 7-Zip instalado."
-                } else {
-                    Update-Messages "❌ Error instalando 7-Zip (código $LASTEXITCODE)."
-                    return
-                }
-            } catch {
-                Update-Messages "❌ Error instalando 7-Zip: $($_.Exception.Message)"
+            Update-Messages "⏳ Instalando 7-Zip via Chocolatey..."
+            & "$chocoPath" install 7zip -y --no-progress 2>&1 | Out-Null
+            if (Test-Path $sevenZip) {
+                Update-Messages "✅ 7-Zip instalado."
+            } else {
+                Update-Messages "❌ No se pudo instalar 7-Zip."
                 return
             }
         } else {
             Update-Messages "✅ 7-Zip ya está instalado."
         }
 
-        # --- 3) Obtener la última versión de SDI Lite desde driveroff.net ---
-        Update-Messages "⏳ Buscando última versión de SDI Lite..."
-        $downloadUrl = $null
-        $fileName    = $null
-        try {
-            $page = Invoke-WebRequest -Uri "http://driveroff.net/drv/" -UseBasicParsing -ErrorAction Stop
-            # Buscar todos los links que coincidan con SDI_R*.7z
-            $links = $page.Links | Where-Object { $_.href -match "SDI_R\d+\.7z" }
-            if (-not $links) {
-                # Fallback: buscar con regex en el contenido
-                $matches = [regex]::Matches($page.Content, 'SDI_R(\d+)\.7z')
-                if ($matches.Count -gt 0) {
-                    $versions = $matches | ForEach-Object { [int]$_.Groups[1].Value } | Sort-Object -Descending
-                    $fileName = "SDI_R$($versions[0]).7z"
-                    $downloadUrl = "http://driveroff.net/drv/$fileName"
-                }
-            } else {
-                $latest = $links | Sort-Object { [regex]::Match($_.href, '\d+').Value -as [int] } -Descending | Select-Object -First 1
-                $fileName = $latest.href -replace '.*/(\S+\.7z).*','$1'
-                $downloadUrl = "http://driveroff.net/drv/$fileName"
-            }
-
-            if (-not $downloadUrl) {
-                # Fallback a versión conocida
-                $fileName    = "SDI_R2601.7z"
-                $downloadUrl = "http://driveroff.net/drv/$fileName"
-                Update-Messages "⚠️ No se pudo detectar la versión, usando: $fileName"
-            } else {
-                Update-Messages "✅ Última versión encontrada: $fileName"
-            }
-        } catch {
-            # Fallback a versión conocida
-            $fileName    = "SDI_R2601.7z"
-            $downloadUrl = "http://driveroff.net/drv/$fileName"
-            Update-Messages "⚠️ Error al buscar versión online, usando: $fileName"
-        }
+        # --- 3) Definir archivo y URL ---
+        $fileName    = "SDI_1.26.1.7z"
+        $downloadUrl = "https://driveroff.net/drv/SDI_1.26.1.7z"
+        $destFile    = "C:\$fileName"
 
         # --- 4) Buscar primero en Downloads de cualquier usuario ---
-        $destFile = "C:\$fileName"
-        $foundLocal = Get-ChildItem "C:\Users\*\Downloads\$fileName" -ErrorAction SilentlyContinue | Select-Object -First 1
-
-        if ($foundLocal) {
-            Update-Messages "✅ Encontrado en Downloads: $($foundLocal.FullName)"
-            Copy-Item $foundLocal.FullName $destFile -Force
-            Update-Messages "✅ Copiado a C:\"
-        } elseif (-not (Test-Path $destFile)) {
-            Update-Messages "⏳ Descargando $fileName ..."
-            try {
-                Invoke-WebRequest -Uri $downloadUrl -OutFile $destFile -UseBasicParsing -ErrorAction Stop
-                Update-Messages "✅ Descarga completada."
-            } catch {
-                Update-Messages "❌ Error al descargar: $($_.Exception.Message)"
-                Update-Messages "   Descarga manual: $downloadUrl"
-                return
+        if (-not (Test-Path $destFile)) {
+            $foundLocal = Get-ChildItem "C:\Users\*\Downloads\$fileName" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($foundLocal) {
+                Update-Messages "✅ Encontrado en: $($foundLocal.FullName)"
+                Update-Messages "⏳ Copiando a C:\..."
+                Copy-Item $foundLocal.FullName $destFile -Force
+                Update-Messages "✅ Copiado a C:\"
+            } else {
+                # --- 5) Descargar ---
+                Update-Messages "⏳ Descargando $fileName desde driveroff.net..."
+                try {
+                    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+                    Invoke-WebRequest -Uri $downloadUrl -OutFile $destFile -UseBasicParsing -ErrorAction Stop
+                    Update-Messages "✅ Descarga completada."
+                } catch {
+                    Update-Messages "❌ Error al descargar: $($_.Exception.Message)"
+                    Update-Messages "   URL: $downloadUrl"
+                    return
+                }
             }
         } else {
             Update-Messages "✅ Archivo ya existe en C:\, omitiendo descarga."
         }
 
         # Validar tamaño
-        $size = (Get-Item $destFile).Length
-        if ($size -lt 1024) {
-            Update-Messages "❌ Archivo corrupto (${size} bytes). Eliminando..."
-            Remove-Item $destFile -Force -ErrorAction SilentlyContinue
+        $size = (Get-Item $destFile -ErrorAction SilentlyContinue).Length
+        if (-not $size -or $size -lt 1024) {
+            Update-Messages "❌ Archivo no encontrado o corrupto."
             return
         }
         Update-Messages "   Tamaño: $([math]::Round($size/1MB, 2)) MB"
 
-        # --- 5) Extraer con 7-Zip ---
+        # --- 6) Extraer con 7-Zip ---
         $folderName  = [System.IO.Path]::GetFileNameWithoutExtension($fileName)
         $extractPath = "C:\$folderName"
 
@@ -1718,10 +1683,13 @@ $commands = @(
         Update-Messages "⏳ Extrayendo en C:\$folderName ..."
 
         try {
-            Start-Process -FilePath $sevenZip `
+            $proc = Start-Process -FilePath $sevenZip `
                 -ArgumentList "x `"$destFile`" -o`"$extractPath`" -y" `
-                -Wait -NoNewWindow -ErrorAction Stop
-
+                -Wait -NoNewWindow -PassThru -ErrorAction Stop
+            if ($proc.ExitCode -ne 0) {
+                Update-Messages "❌ 7-Zip falló con código $($proc.ExitCode)."
+                return
+            }
             $archivos = Get-ChildItem $extractPath -Recurse -ErrorAction Stop
             if ($archivos.Count -eq 0) {
                 Update-Messages "❌ Extracción fallida, carpeta vacía."
@@ -1733,7 +1701,7 @@ $commands = @(
             return
         }
 
-        # --- 6) Mover el .7z dentro de la carpeta extraída ---
+        # --- 7) Mover el .7z dentro de la carpeta extraída ---
         try {
             $dest7z = Join-Path $extractPath $fileName
             Move-Item -Path $destFile -Destination $dest7z -Force -ErrorAction Stop
@@ -1745,7 +1713,7 @@ $commands = @(
         Update-Messages "-----------------------------------------"
         Update-Messages "✅ SDI Lite listo en C:\$folderName"
         Update-Messages "-----------------------------------------"
-        Start-Sleep -Seconds 2
+        Start-Sleep -Seconds 3
         $script:ExecutedOptions['130'] = $true
         Clear-Messages
     }
