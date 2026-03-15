@@ -1592,83 +1592,143 @@ $commands = @(
 }
 
 # ---------------------------------------
+# ---------------------------------------
 # OK - claude
 @{
-    Name = "130 - Descargar y descomprimir Snappy Driver Installer 7z"
+    Name = "130 - Descargar e instalar Snappy Driver Installer Lite"
     Action = {
         Clear-Messages
-        Update-Messages "Iniciando descarga de Snappy Driver Installer..."
+        Update-Messages "Iniciando configuración de Snappy Driver Installer Lite..."
+        Update-Messages "-----------------------------------------"
 
-        $url         = "https://driveroff.net/drv/SDI_1.25.3.7z"
-        $output7z    = "C:\SDI_1.25.3.7z"
-        $extractPath = "C:\SDI_1.25.3"
-        $sevenZip    = "$env:ProgramFiles\7-Zip\7z.exe"
-
-        # Verificar 7-Zip
-        if (-not (Test-Path $sevenZip)) {
-            Update-Messages "❌ 7-Zip no encontrado. Instálalo primero con la opción 121 o 122."
-            return
-        }
-
-        # PASO 1: Descargar
-        if (-not (Test-Path $output7z)) {
-            Update-Messages "⏳ Descargando SDI desde $url ..."
+        # --- 1) Instalar Chocolatey si no está ---
+        $chocoPath = "$env:ProgramData\chocolatey\bin\choco.exe"
+        if (-not (Test-Path $chocoPath)) {
+            Update-Messages "⏳ Chocolatey no detectado. Instalando..."
             try {
-                Invoke-WebRequest -Uri $url -OutFile $output7z -UseBasicParsing -ErrorAction Stop
-                Update-Messages "✅ Descarga completada."
+                Set-ExecutionPolicy Bypass -Scope Process -Force
+                [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+                Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+                Start-Sleep -Seconds 2
+                Update-Messages "✅ Chocolatey instalado."
             } catch {
-                Update-Messages "❌ Error al descargar: $($_.Exception.Message)"
+                Update-Messages "❌ Error instalando Chocolatey: $($_.Exception.Message)"
                 return
             }
         } else {
-            Update-Messages "✅ Archivo ya existe, omitiendo descarga."
+            Update-Messages "✅ Chocolatey ya está instalado."
         }
 
-        # Validar archivo
-        $size = (Get-Item $output7z).Length
+        # --- 2) Instalar 7-Zip si no está ---
+        $sevenZip = "$env:ProgramFiles\7-Zip\7z.exe"
+        if (-not (Test-Path $sevenZip)) {
+            Update-Messages "⏳ Instalando 7-Zip..."
+            try {
+                & "$chocoPath" install 7zip -y --no-progress 2>&1 | Out-Null
+                if ($LASTEXITCODE -eq 0) {
+                    Update-Messages "✅ 7-Zip instalado."
+                } else {
+                    Update-Messages "❌ Error instalando 7-Zip (código $LASTEXITCODE)."
+                    return
+                }
+            } catch {
+                Update-Messages "❌ Error instalando 7-Zip: $($_.Exception.Message)"
+                return
+            }
+        } else {
+            Update-Messages "✅ 7-Zip ya está instalado."
+        }
+
+        # --- 3) Obtener la última versión de SDI Lite desde GitHub ---
+        Update-Messages "⏳ Buscando última versión de SDI Lite..."
+        $downloadUrl = $null
+        $fileName    = $null
+        try {
+            $apiUrl   = "https://api.github.com/repos/gtumanyan/SDI/releases/latest"
+            $headers  = @{ "User-Agent" = "PowerShell" }
+            $release  = Invoke-RestMethod -Uri $apiUrl -Headers $headers -ErrorAction Stop
+            $asset    = $release.assets | Where-Object { $_.name -like "SDI_R*.7z" } | Select-Object -First 1
+            if (-not $asset) {
+                Update-Messages "❌ No se encontró el archivo SDI_R*.7z en la última release."
+                return
+            }
+            $downloadUrl = $asset.browser_download_url
+            $fileName    = $asset.name
+            Update-Messages "✅ Última versión encontrada: $fileName"
+        } catch {
+            Update-Messages "❌ Error consultando GitHub: $($_.Exception.Message)"
+            return
+        }
+
+        # --- 4) Descargar SDI Lite ---
+        $destFile = "C:\$fileName"
+        if (-not (Test-Path $destFile)) {
+            Update-Messages "⏳ Descargando $fileName ..."
+            try {
+                Invoke-WebRequest -Uri $downloadUrl -OutFile $destFile -UseBasicParsing -ErrorAction Stop
+                Update-Messages "✅ Descarga completada."
+            } catch {
+                # Intentar copiar desde Downloads de cualquier usuario
+                Update-Messages "⚠️ Descarga directa fallida. Buscando en carpetas de usuario..."
+                $found = Get-ChildItem "C:\Users\*\Downloads\$fileName" -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($found) {
+                    Copy-Item $found.FullName $destFile -Force
+                    Update-Messages "✅ Copiado desde: $($found.FullName)"
+                } else {
+                    Update-Messages "❌ No se encontró el archivo en ninguna carpeta de Downloads."
+                    return
+                }
+            }
+        } else {
+            Update-Messages "✅ Archivo ya existe en C:\, omitiendo descarga."
+        }
+
+        # Validar tamaño
+        $size = (Get-Item $destFile).Length
         if ($size -lt 1024) {
-            Update-Messages "❌ El archivo descargado parece corrupto (${size} bytes)."
-            Remove-Item $output7z -Force -ErrorAction SilentlyContinue
+            Update-Messages "❌ Archivo corrupto (${size} bytes). Eliminando..."
+            Remove-Item $destFile -Force -ErrorAction SilentlyContinue
             return
         }
         Update-Messages "   Tamaño: $([math]::Round($size/1MB, 2)) MB"
 
-        # PASO 2: Preparar carpeta
+        # --- 5) Extraer con 7-Zip ---
+        $folderName  = [System.IO.Path]::GetFileNameWithoutExtension($fileName)
+        $extractPath = "C:\$folderName"
+
         if (Test-Path $extractPath) {
-            Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
         }
         New-Item -ItemType Directory -Path $extractPath -Force | Out-Null
-        Update-Messages "✅ Carpeta destino lista: $extractPath"
+        Update-Messages "⏳ Extrayendo en C:\$folderName ..."
 
-        # PASO 3: Descomprimir
-        Update-Messages "⏳ Descomprimiendo..."
         try {
             Start-Process -FilePath $sevenZip `
-                -ArgumentList "x `"$output7z`" -o`"$extractPath`" -y" `
+                -ArgumentList "x `"$destFile`" -o`"$extractPath`" -y" `
                 -Wait -NoNewWindow -ErrorAction Stop
 
-            $archivos = Get-ChildItem -Path $extractPath -Recurse -ErrorAction Stop
+            $archivos = Get-ChildItem $extractPath -Recurse -ErrorAction Stop
             if ($archivos.Count -eq 0) {
-                Update-Messages "❌ La carpeta de destino está vacía. Descompresión fallida."
+                Update-Messages "❌ Extracción fallida, carpeta vacía."
                 return
             }
-            Update-Messages "✅ Descompresión completada. $($archivos.Count) archivos extraídos."
+            Update-Messages "✅ Extraído correctamente ($($archivos.Count) archivos)."
         } catch {
-            Update-Messages "❌ Error al descomprimir: $($_.Exception.Message)"
+            Update-Messages "❌ Error al extraer: $($_.Exception.Message)"
             return
         }
 
-        # PASO 4: Mover el 7z dentro de la carpeta
+        # --- 6) Mover el .7z dentro de la carpeta extraída ---
         try {
-            $dest7z = Join-Path $extractPath (Split-Path $output7z -Leaf)
-            Move-Item -Path $output7z -Destination $dest7z -Force -ErrorAction Stop
-            Update-Messages "✅ Archivo 7z movido a: $dest7z"
+            $dest7z = Join-Path $extractPath $fileName
+            Move-Item -Path $destFile -Destination $dest7z -Force -ErrorAction Stop
+            Update-Messages "✅ Archivo .7z movido dentro de la carpeta."
         } catch {
-            Update-Messages "⚠️ No se pudo mover el archivo 7z: $($_.Exception.Message)"
+            Update-Messages "⚠️ No se pudo mover el .7z: $($_.Exception.Message)"
         }
 
         Update-Messages "-----------------------------------------"
-        Update-Messages "✅ Snappy Driver Installer listo en $extractPath"
+        Update-Messages "✅ SDI Lite listo en C:\$folderName"
         Update-Messages "-----------------------------------------"
         Start-Sleep -Seconds 2
         $script:ExecutedOptions['130'] = $true
@@ -2404,7 +2464,6 @@ Seleccione la versión de Windows para activar:
 }
 
 # ---------------------------------------
-# OK - claude
 # OK - claude
 @{
     Name = "300 - Crear impresoras genéricas BARRA y COCINA";
