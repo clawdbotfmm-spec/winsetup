@@ -1614,7 +1614,7 @@ $commands = @(
 # --------------------------------------- 
 
 @{
-    Name = "113 - Descargar y descomprimir Snappy Driver Installer 7z"
+    Name = "150 - Descargar y descomprimir Snappy Driver Installer 7z"
     Action = {
         if (-not $script:Task11Started) {
             Clear-Messages
@@ -2520,35 +2520,26 @@ function Show-Menu {
             Write-Host $command.Name -ForegroundColor Yellow
         }
 
-# Separadores específicos
+        # Separadores específicos
         if ($command.Name -like "009*") {
             Write-Host "======================================" -ForegroundColor Blue
         }
-if ($command.Name -like "118*") {
+        if ($command.Name -like "118*") {
             Write-Host "======================================" -ForegroundColor Blue
         }
-
-
-
-
-        
-        
-if ($command.Name -like "22*") {
+        if ($command.Name -like "122*") {
             Write-Host "======================================" -ForegroundColor Blue
         }
-if ($command.Name -like "25*") {
+        if ($command.Name -like "22*") {
             Write-Host "======================================" -ForegroundColor Blue
         }
-if ($command.Name -like "26*") {
+        if ($command.Name -like "26*") {
             Write-Host "======================================" -ForegroundColor Blue
         }
-if ($command.Name -like "27*") {
+        if ($command.Name -like "27*") {
             Write-Host "======================================" -ForegroundColor Blue
         }
-if ($command.Name -like "30*") {
-            Write-Host "======================================" -ForegroundColor Blue
-        }
-if ($command.Name -like "40*") {
+        if ($command.Name -like "30*") {
             Write-Host "======================================" -ForegroundColor Blue
         }
     }
