@@ -2501,6 +2501,9 @@ function Show-Menu {
         }
         if ($command.Name -like "132*") {
             Write-Host "======================================" -ForegroundColor Blue
+if ($command.Name -like "150*") {
+            Write-Host "======================================" -ForegroundColor Blue
+        }
         }
         if ($command.Name -like "26*") {
             Write-Host "======================================" -ForegroundColor Blue
