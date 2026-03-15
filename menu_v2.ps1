@@ -946,6 +946,528 @@ $commands = @(
 }
 
 # ---------------------------------------  
+# ---------------------------------------
+# OK - claude
+@{
+    Name     = "110 - Instalar Chocolatey"
+    Action   = {
+        $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+        if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            Update-Messages "❌ Error: Este script requiere ejecutarse como administrador."
+            Start-Sleep -Seconds 3
+            return
+        }
+
+        Clear-Messages
+        Update-Messages "Iniciando tarea: Instalar Chocolatey..."
+
+        $chocoPath = "$env:ProgramData\chocolatey\bin\choco.exe"
+        if (-not (Test-Path $chocoPath)) {
+            Update-Messages "Chocolatey no detectado. Instalando..."
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+            try {
+                Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+                Start-Sleep -Seconds 2
+                Update-Messages "✅ Chocolatey instalado correctamente."
+            } catch {
+                Update-Messages "❌ Error instalando Chocolatey: $($_.Exception.Message)"
+            }
+        } else {
+            Update-Messages "✅ Chocolatey ya está instalado."
+        }
+
+        Clear-Messages
+    }
+    Executed = $false
+}
+
+# ---------------------------------------
+# ---------------------------------------
+# OK - claude
+@{
+    Name = "111 - Instalar entorno de desarrollo (Node.js, npm, pnpm, Git)"
+    Action = {
+        Clear-Messages
+        Update-Messages "Iniciando instalación de entorno de desarrollo..."
+
+        $chocoPath = "$env:ProgramData\chocolatey\bin\choco.exe"
+        if (-not (Test-Path $chocoPath)) {
+            Update-Messages "❌ ERROR: Chocolatey no está instalado. Ejecuta primero la opción 110."
+            return
+        }
+
+        function Show-TextBar {
+            param([int]$Percent, [string]$Activity)
+            $barLength    = 30
+            $filledLength = [int]($barLength * $Percent / 100)
+            $bar          = "█" * $filledLength + "░" * ($barLength - $filledLength)
+            Update-Messages "[${bar}] ${Percent}% - ${Activity}"
+        }
+
+        function Install-Choco {
+            param([string]$Nombre, [string]$Paquete, [string]$CheckPath = "")
+            $instalado = $false
+            if ($CheckPath -and (Test-Path $CheckPath)) {
+                $instalado = $true
+            } elseif (-not $CheckPath) {
+                $result = & "$chocoPath" list --local-only $Paquete 2>$null
+                if ($result -match $Paquete) { $instalado = $true }
+            }
+
+            if ($instalado) {
+                Update-Messages "   ✅ $Nombre ya está instalado."
+                return
+            }
+
+            Update-Messages "   ⏳ Instalando $Nombre..."
+            & "$chocoPath" install $Paquete -y --no-progress 2>&1 | Out-Null
+
+            if ($LASTEXITCODE -eq 0) {
+                Update-Messages "   ✅ $Nombre instalado correctamente."
+            } else {
+                Update-Messages "   ❌ Error instalando $Nombre."
+            }
+
+            foreach ($desk in @(
+                [Environment]::GetFolderPath("CommonDesktopDirectory"),
+                [Environment]::GetFolderPath("Desktop")
+            )) {
+                Get-ChildItem $desk -Filter "*.lnk" -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Name -like "*$Nombre*" } |
+                    Remove-Item -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        # --- 1) Node.js ---
+        Show-TextBar -Percent 10 -Activity "Verificando Node.js..."
+        Install-Choco -Nombre "Node.js" -Paquete "nodejs-lts" `
+            -CheckPath "$env:ProgramFiles\nodejs\node.exe"
+
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
+                    [System.Environment]::GetEnvironmentVariable("Path","User")
+
+        # --- 2) npm ---
+        Show-TextBar -Percent 35 -Activity "Actualizando npm a última versión..."
+        try {
+            $npmVersion = & npm --version 2>$null
+            if ($npmVersion) {
+                Update-Messages "   ⏳ npm detectado v$npmVersion, actualizando..."
+                & npm install -g npm 2>&1 | Out-Null
+                $npmVersionNew = & npm --version 2>$null
+                Update-Messages "   ✅ npm actualizado a v$npmVersionNew"
+            } else {
+                Update-Messages "   ❌ npm no detectado tras instalar Node.js."
+            }
+        } catch {
+            Update-Messages "   ❌ Error actualizando npm: $($_.Exception.Message)"
+        }
+
+        # --- 3) pnpm ---
+        Show-TextBar -Percent 60 -Activity "Verificando pnpm..."
+        try {
+            $pnpmVersion = & pnpm --version 2>$null
+            if ($pnpmVersion) {
+                Update-Messages "   ✅ pnpm ya está instalado v$pnpmVersion"
+            } else {
+                Update-Messages "   ⏳ Instalando pnpm..."
+                & npm install -g pnpm 2>&1 | Out-Null
+                $pnpmVersionNew = & pnpm --version 2>$null
+                Update-Messages "   ✅ pnpm instalado v$pnpmVersionNew"
+            }
+        } catch {
+            Update-Messages "   ❌ Error instalando pnpm: $($_.Exception.Message)"
+        }
+
+        # --- 4) Git ---
+        Show-TextBar -Percent 80 -Activity "Verificando Git..."
+        Install-Choco -Nombre "Git" -Paquete "git" `
+            -CheckPath "$env:ProgramFiles\Git\bin\git.exe"
+
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
+                    [System.Environment]::GetEnvironmentVariable("Path","User")
+
+        # --- Resumen ---
+        Show-TextBar -Percent 100 -Activity "Instalación completada."
+        Update-Messages "-----------------------------------------"
+        Update-Messages "📋 Versiones instaladas:"
+        try { Update-Messages "   Node.js : $(& node --version 2>$null)" } catch {}
+        try { Update-Messages "   npm     : v$(& npm --version 2>$null)" } catch {}
+        try { Update-Messages "   pnpm    : v$(& pnpm --version 2>$null)" } catch {}
+        try { Update-Messages "   Git     : $(& git --version 2>$null)" } catch {}
+        Update-Messages "-----------------------------------------"
+        Update-Messages "✅ Entorno de desarrollo instalado correctamente."
+        Update-Messages "-----------------------------------------"
+        Start-Sleep -Seconds 2
+        Clear-Messages
+    }
+    Executed = $false
+}
+
+# ---------------------------------------
+# ---------------------------------------
+# OK - claude
+@{
+    Name     = "112 - Instalar Telegram Desktop (Chocolatey)"
+    Action   = {
+        Clear-Messages
+        Update-Messages "Iniciando instalación de Telegram Desktop..."
+
+        $chocoPath = "$env:ProgramData\chocolatey\bin\choco.exe"
+        if (-not (Test-Path $chocoPath)) {
+            Update-Messages "❌ Error: Chocolatey no está instalado. Ejecuta primero la opción 110."
+            return
+        }
+
+        try {
+            Update-Messages "⏳ Ejecutando: choco install telegram -y"
+            & "$chocoPath" install telegram -y --no-progress 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Update-Messages "✅ Telegram instalado correctamente."
+            } else {
+                Update-Messages "❌ Error al instalar Telegram (código $LASTEXITCODE)."
+            }
+        } catch {
+            Update-Messages "❌ Error al instalar Telegram: $($_.Exception.Message)"
+        }
+
+        Start-Sleep -Seconds 2
+        Clear-Messages
+    }
+    Executed = $false
+}
+
+# ---------------------------------------
+# ---------------------------------------
+# OK - claude
+@{
+    Name     = "113 - Instalar Ollama (Chocolatey)"
+    Action   = {
+        Clear-Messages
+        Update-Messages "Iniciando instalación de Ollama..."
+
+        $chocoPath = "$env:ProgramData\chocolatey\bin\choco.exe"
+        if (-not (Test-Path $chocoPath)) {
+            Update-Messages "❌ Error: Chocolatey no está instalado. Ejecuta primero la opción 110."
+            return
+        }
+
+        # Verificar si ya está instalado
+        if (Get-Command ollama -ErrorAction SilentlyContinue) {
+            Update-Messages "✅ Ollama ya está instalado."
+            $version = & ollama --version 2>$null
+            Update-Messages "   Versión: $version"
+            Start-Sleep -Seconds 2
+            Clear-Messages
+            return
+        }
+
+        try {
+            Update-Messages "⏳ Ejecutando: choco install ollama -y"
+            & "$chocoPath" install ollama -y --no-progress 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
+                            [System.Environment]::GetEnvironmentVariable("Path","User")
+                Update-Messages "✅ Ollama instalado correctamente."
+                $version = & ollama --version 2>$null
+                Update-Messages "   Versión: $version"
+            } else {
+                Update-Messages "❌ Error al instalar Ollama (código $LASTEXITCODE)."
+            }
+        } catch {
+            Update-Messages "❌ Error al instalar Ollama: $($_.Exception.Message)"
+        }
+
+        Start-Sleep -Seconds 2
+        Clear-Messages
+    }
+    Executed = $false
+}
+
+# ---------------------------------------
+# ---------------------------------------
+# OK - claude
+@{
+    Name     = "114 - Descargar GLM-5:cloud"
+    Action   = {
+        Clear-Messages
+        Update-Messages "Iniciando descarga del modelo GLM-5:cloud..."
+
+        # Verificar que Ollama está instalado
+        if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
+            Update-Messages "❌ Ollama no está instalado. Ejecuta primero la opción 113."
+            return
+        }
+
+        try {
+            Update-Messages "⏳ Descargando modelo 'glm4:latest' (esto puede tardar varios minutos)..."
+            Update-Messages "   Conectando con Ollama..."
+            & ollama pull glm4:latest 2>&1 | ForEach-Object { Update-Messages "   $_" }
+
+            if ($LASTEXITCODE -eq 0) {
+                Update-Messages "-----------------------------------------"
+                Update-Messages "✅ Modelo 'glm4:latest' descargado correctamente."
+                Update-Messages "-----------------------------------------"
+            } else {
+                Update-Messages "❌ Error al descargar el modelo (código $LASTEXITCODE)."
+                Update-Messages "   Verifica tu conexión o el nombre del modelo."
+            }
+        } catch {
+            Update-Messages "❌ Error: $($_.Exception.Message)"
+        }
+
+        Start-Sleep -Seconds 2
+        Clear-Messages
+    }
+    Executed = $false
+}
+
+# ---------------------------------------
+# ---------------------------------------
+# OK - claude
+@{
+    Name   = "115 - Lanzar OpenClaw (Ollama)"
+    Action = {
+        Clear-Messages
+        Update-Messages "Iniciando OpenClaw con Ollama..."
+
+        # Verificar que Ollama está instalado
+        if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
+            Update-Messages "❌ Ollama no está instalado. Ejecuta primero la opción 113."
+            return
+        }
+
+        try {
+            Update-Messages "⏳ Ejecutando: ollama launch openclaw"
+            Update-Messages "   Si es la primera vez, Ollama instalará OpenClaw automáticamente."
+            Update-Messages "   Sigue las instrucciones en pantalla para configurarlo."
+            Update-Messages "-----------------------------------------"
+            & ollama launch openclaw
+        } catch {
+            Update-Messages "❌ Error al lanzar OpenClaw: $($_.Exception.Message)"
+        }
+    }
+    Executed = $false
+}
+
+# ---------------------------------------
+# ---------------------------------------
+# OK - claude
+@{
+    Name = "117 - Instalación OpenClaw sin lanzar (110-114)"
+    Action = {
+        Clear-Messages
+        Update-Messages "Iniciando instalación completa OpenClaw..."
+        Update-Messages "Secuencia: 110 → 111 → 112 → 113 → 114"
+        Update-Messages "-----------------------------------------"
+
+        function Show-TextBar {
+            param([int]$Percent, [string]$Activity)
+            $barLength    = 30
+            $filledLength = [int]($barLength * $Percent / 100)
+            $bar          = "█" * $filledLength + "░" * ($barLength - $filledLength)
+            Update-Messages "[${bar}] ${Percent}% - ${Activity}"
+        }
+
+        $secuencia = @(
+            @{ Orden = "110"; Desc = "Instalar Chocolatey" },
+            @{ Orden = "111"; Desc = "Instalar entorno de desarrollo (Node.js, npm, pnpm, Git)" },
+            @{ Orden = "112"; Desc = "Instalar Telegram Desktop" },
+            @{ Orden = "113"; Desc = "Instalar Ollama" },
+            @{ Orden = "114"; Desc = "Descargar GLM-5:cloud" }
+        )
+
+        $total   = $secuencia.Count
+        $current = 0
+        $errores = @()
+
+        foreach ($paso in $secuencia) {
+            $current++
+            $percent = [int](($current / $total) * 100)
+            Show-TextBar -Percent $percent -Activity "($current/$total) $($paso.Desc)"
+
+            $cmd = $commands | Where-Object { $_.Name -match "^$($paso.Orden)\s*-" } | Select-Object -First 1
+
+            if ($null -eq $cmd) {
+                Update-Messages "   ⚠️ Módulo $($paso.Orden) no encontrado, omitiendo."
+                $errores += $paso.Orden
+                continue
+            }
+
+            try {
+                Update-Messages "-----------------------------------------"
+                Update-Messages "▶️ Ejecutando: $($cmd.Name)"
+                & $cmd.Action
+                $cmd.Executed = $true
+                Update-Messages "✅ $($paso.Desc) completado."
+            } catch {
+                Update-Messages "❌ Error en $($paso.Desc): $($_.Exception.Message)"
+                $errores += $paso.Orden
+            }
+        }
+
+        Update-Messages "-----------------------------------------"
+        Update-Messages "📋 Resumen de la secuencia:"
+        foreach ($paso in $secuencia) {
+            if ($errores -contains $paso.Orden) {
+                Update-Messages "   ❌ $($paso.Orden) - $($paso.Desc)"
+            } else {
+                Update-Messages "   ✅ $($paso.Orden) - $($paso.Desc)"
+            }
+        }
+        Update-Messages "-----------------------------------------"
+
+        if ($errores.Count -eq 0) {
+            Update-Messages "✅ Instalación OpenClaw completada sin errores."
+        } else {
+            Update-Messages "⚠️ Completado con $($errores.Count) error(es). Revisa los módulos marcados."
+        }
+
+        Start-Sleep -Seconds 2
+        Clear-Messages
+    }
+    Executed = $false
+}
+
+# ---------------------------------------
+# ---------------------------------------
+# OK - claude
+@{
+    Name = "118 - Instalación OpenClaw completa con lanzar (110-115)"
+    Action = {
+        Clear-Messages
+        Update-Messages "Iniciando instalación y lanzamiento completo OpenClaw..."
+        Update-Messages "Secuencia: 110 → 111 → 112 → 113 → 114 → 115"
+        Update-Messages "-----------------------------------------"
+
+        function Show-TextBar {
+            param([int]$Percent, [string]$Activity)
+            $barLength    = 30
+            $filledLength = [int]($barLength * $Percent / 100)
+            $bar          = "█" * $filledLength + "░" * ($barLength - $filledLength)
+            Update-Messages "[${bar}] ${Percent}% - ${Activity}"
+        }
+
+        $secuencia = @(
+            @{ Orden = "110"; Desc = "Instalar Chocolatey" },
+            @{ Orden = "111"; Desc = "Instalar entorno de desarrollo (Node.js, npm, pnpm, Git)" },
+            @{ Orden = "112"; Desc = "Instalar Telegram Desktop" },
+            @{ Orden = "113"; Desc = "Instalar Ollama" },
+            @{ Orden = "114"; Desc = "Descargar GLM-5:cloud" },
+            @{ Orden = "115"; Desc = "Lanzar OpenClaw" }
+        )
+
+        $total   = $secuencia.Count
+        $current = 0
+        $errores = @()
+
+        foreach ($paso in $secuencia) {
+            $current++
+            $percent = [int](($current / $total) * 100)
+            Show-TextBar -Percent $percent -Activity "($current/$total) $($paso.Desc)"
+
+            $cmd = $commands | Where-Object { $_.Name -match "^$($paso.Orden)\s*-" } | Select-Object -First 1
+
+            if ($null -eq $cmd) {
+                Update-Messages "   ⚠️ Módulo $($paso.Orden) no encontrado, omitiendo."
+                $errores += $paso.Orden
+                continue
+            }
+
+            try {
+                Update-Messages "-----------------------------------------"
+                Update-Messages "▶️ Ejecutando: $($cmd.Name)"
+                & $cmd.Action
+                $cmd.Executed = $true
+                Update-Messages "✅ $($paso.Desc) completado."
+            } catch {
+                Update-Messages "❌ Error en $($paso.Desc): $($_.Exception.Message)"
+                $errores += $paso.Orden
+            }
+        }
+
+        Update-Messages "-----------------------------------------"
+        Update-Messages "📋 Resumen de la secuencia:"
+        foreach ($paso in $secuencia) {
+            if ($errores -contains $paso.Orden) {
+                Update-Messages "   ❌ $($paso.Orden) - $($paso.Desc)"
+            } else {
+                Update-Messages "   ✅ $($paso.Orden) - $($paso.Desc)"
+            }
+        }
+        Update-Messages "-----------------------------------------"
+
+        if ($errores.Count -eq 0) {
+            Update-Messages "✅ Instalación y lanzamiento OpenClaw completados sin errores."
+        } else {
+            Update-Messages "⚠️ Completado con $($errores.Count) error(es). Revisa los módulos marcados."
+        }
+
+        Start-Sleep -Seconds 2
+        Clear-Messages
+    }
+    Executed = $false
+}
+
+# ---------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # OK Claude
 @{
@@ -2258,15 +2780,15 @@ function Show-Menu {
         if ($command.Name -like "009*") {
             Write-Host "======================================" -ForegroundColor Blue
         }
-
+if ($command.Name -like "118*") {
+            Write-Host "======================================" -ForegroundColor Blue
+        }
 
 
 
 
         
-        if ($command.Name -like "13*") {
-            Write-Host "======================================" -ForegroundColor Blue
-        }
+        
 if ($command.Name -like "22*") {
             Write-Host "======================================" -ForegroundColor Blue
         }
