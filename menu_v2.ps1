@@ -2405,6 +2405,7 @@ Seleccione la versión de Windows para activar:
 
 # ---------------------------------------
 # OK - claude
+# OK - claude
 @{
     Name = "300 - Crear impresoras genéricas BARRA y COCINA";
     Action = {
